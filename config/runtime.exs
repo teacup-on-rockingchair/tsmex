@@ -20,6 +20,13 @@ if System.get_env("PHX_SERVER") do
   config :system_monitor, SystemMonitorWeb.Endpoint, server: true
 end
 
+# Authentication credentials (all environments)
+if config_env() in [:dev, :test] do
+  config :system_monitor,
+    auth_username: System.get_env("AUTH_USERNAME") || "admin",
+    auth_password: System.get_env("AUTH_PASSWORD") || "admin"
+end
+
 config :system_monitor, SystemMonitorWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
@@ -82,4 +89,9 @@ if config_env() == :prod do
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
+
+  # Authentication credentials
+  config :system_monitor,
+        auth_username: System.fetch_env!("AUTH_USERNAME"),
+        auth_password: System.fetch_env!("AUTH_PASSWORD")
 end

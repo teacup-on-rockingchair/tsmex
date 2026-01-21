@@ -1,0 +1,25 @@
+<header class="bg-white shadow-sm">
+  <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-gray-900">
+        <.link navigate={~p"/"} class="hover: text-blue-600">
+          System Monitor
+        </.link>
+      </h1>
+      <a
+        href="/logout"
+        class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2"
+      >
+        <span>Logout</span>
+        <span class="text-lg">→</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="px-4 py-20 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-full">
+    <.flash_group flash={@flash} />
+    <%= @inner_content %>
+  </div>
+</main>
