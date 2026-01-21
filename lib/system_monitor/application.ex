@@ -12,6 +12,7 @@ defmodule SystemMonitor.Application do
       {Registry, keys: :unique, name: SystemMonitor.WorkerRegistry},
       SystemMonitor.Storage.Records,
       SystemMonitor.Scheduler.Supervisor,
+      SystemMonitor.SSH.ConnectionPool,
       SystemMonitorWeb.Endpoint
     ]
 

@@ -5,37 +5,60 @@ defmodule SystemMonitor.SSH.CommandRunner do
 
   require Logger
   alias SystemMonitor.SSH.Client
+  alias SystemMonitor.SSH.ConnectionPool
 
   def execute(system, command, timeout \\ 10_000) do
-    Logger.info("=== Executing command on #{system.name} ===")
-    Logger.info("Original command: #{command}")
-    Logger.info("System has sudo_password: #{!is_nil(Map.get(system, :sudo_password))}")
+    # Acquire connection slot
+    case ConnectionPool.acquire() do
+      :ok ->
+        try do
+          do_execute(system, command, timeout)
+        after
+          ConnectionPool.release()
+        end
+
+      :retry ->
+        Process.sleep(100)
+        execute(system, command, timeout)
+    end
+  end
+
+  def do_execute(system, command, timeout \\ 10_000) do
+    Logger.debug("=== Executing command on #{system.name} ===")
+    Logger.debug("Original command: #{command}")
+    Logger.debug("System has sudo_password: #{!is_nil(Map.get(system, :sudo_password))}")
 
     case Client.connect(system) do
       {:ok, conn} ->
-        Logger.info("Connected successfully to #{system.name}")
+        try do
+          Logger.debug("Connected successfully to #{system.name}")
 
-        # Wrap command to run as root
-        final_command = wrap_with_sudo(system, command)
-        Logger.info("Final command: #{final_command}")
+          # Wrap command to run as root
+          final_command = wrap_with_sudo(system, command)
+          Logger.debug("Final command: #{final_command}")
 
-        sudo_password = Map.get(system, :sudo_password)
-        Logger.info("Passing sudo_password: #{!is_nil(sudo_password)}")
+          sudo_password = Map.get(system, :sudo_password)
+          Logger.debug("Passing sudo_password: #{!is_nil(sudo_password)}")
 
-        result = Client.execute(conn, final_command, timeout, sudo_password)
-        Client.disconnect(conn)
+          result = Client.execute(conn, final_command, timeout, sudo_password)
+          Client.disconnect(conn)
 
-        case result do
-          {:ok, output} ->
-            Logger.info("Command succeeded, output length: #{String.length(output)}")
-            Logger.debug("Raw output: #{inspect(output)}")
-            cleaned = clean_sudo_output(output)
-            Logger.debug("Cleaned output: #{inspect(cleaned)}")
-            cleaned
+          case result do
+            {:ok, output} ->
+              Logger.debug("Command succeeded, output length: #{String.length(output)}")
+              Logger.debug("Raw output: #{inspect(output)}")
+              cleaned = clean_sudo_output(output)
+              Logger.debug("Cleaned output: #{inspect(cleaned)}")
+              cleaned
 
-          {:error, reason} ->
-            Logger.error("Command failed: #{inspect(reason)}")
-            "Error: #{inspect(reason)}"
+            {:error, reason} ->
+              Logger.error("Command failed: #{inspect(reason)}")
+              "Error: #{inspect(reason)}"
+          end
+        after
+          # ALWAYS disconnect, even on error
+          Client.disconnect(conn)
+          Logger.debug("Connection closed for #{system.name}")
         end
 
       {:error, reason} ->
@@ -79,7 +102,7 @@ defmodule SystemMonitor.SSH.CommandRunner do
         {"sudo -S #{command}", sudo_password}
     end
   end
-  
+
   defp clean_sudo_output(output) do
     output
     |> String.replace(~r/^.*Read-only file system.*/m, "")

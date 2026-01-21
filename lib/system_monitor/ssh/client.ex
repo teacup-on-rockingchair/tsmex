@@ -23,7 +23,7 @@ defmodule SystemMonitor.SSH.Client do
     ]
 
     case :ssh.connect(
-           String.to_charlist(system. ip),
+           String.to_charlist(system.ip),
            system.port,
            options,
            system.timeout
@@ -42,7 +42,7 @@ defmodule SystemMonitor.SSH.Client do
       user: String.to_charlist(system.username),
       silently_accept_hosts: true,
       user_interaction: false,
-      connect_timeout: system. timeout
+      connect_timeout: system.timeout
     ]
 
     options =
@@ -75,18 +75,24 @@ defmodule SystemMonitor.SSH.Client do
   def execute(conn, command, timeout \\ 10_000, sudo_password \\ nil) do
     case :ssh_connection.session_channel(conn, timeout) do
       {:ok, channel_id} ->
-        success = :ssh_connection.exec(conn, channel_id, String.to_charlist(command), timeout)
-        # Send sudo password if provided
-        if sudo_password do
-          :ssh_connection.send(conn, channel_id, "#{sudo_password}\n")
-        end
+        try do
+          success = :ssh_connection.exec(conn, channel_id, String.to_charlist(command), timeout)
+          # Send sudo password if provided
+          if sudo_password do
+            :ssh_connection.send(conn, channel_id, "#{sudo_password}\n")
+          end
 
-        case success do
-          :success ->
-            receive_output(conn, channel_id, "", timeout)
+          case success do
+            :success ->
+              receive_output(conn, channel_id, "", timeout)
 
-          :failure ->
-            {:error, "Failed to execute command"}
+            :failure ->
+              {:error, "Failed to execute command"}
+          end
+        after
+          # ALWAYS close channel
+          :ssh_connection.close(conn, channel_id)
+          Logger.debug("Channel #{channel_id} closed")
         end
 
       {:error, reason} ->
