@@ -1,0 +1,22 @@
+{
+  "systems": [
+    {
+      "name": "analyzer-01",
+      "ip": "192.168.1.100",
+      "username": "admin",
+      "password": "CHANGE_ME",
+      "port": 22,
+      "enabled": true,
+      "notes": "Use either 'password' or 'ssh_key_path', not both"
+    },
+    {
+      "name": "analyzer-02",
+      "ip":  "192.168.1.101",
+      "username": "admin",
+      "ssh_key_path": "/home/user/.ssh/id_rsa",
+      "port": 22,
+      "enabled": false,
+      "notes": "SSH key authentication (recommended)"
+    }
+  ]
+}

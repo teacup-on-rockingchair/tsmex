@@ -1,0 +1,68 @@
+{
+  "commands": [
+    {
+      "id": "system_errors",
+      "description": "System Errors",
+      "command": "journalctl -p err -n 100",
+      "format": "icon",
+      "order": 1,
+      "enabled": true
+    },
+    {
+      "id": "clock_status",
+      "description": "Clock",
+      "command": "date",
+      "format": "raw",
+      "order": 2,
+      "enabled": true
+    },
+    {
+      "id": "lis1_status",
+      "description": "LIS1",
+      "command": "systemctl status lis1",
+      "format": "icon",
+      "order": 3,
+      "enabled": true
+    },
+    {
+      "id":  "lis2_status",
+      "description": "LIS2",
+      "command": "systemctl status lis2",
+      "format": "icon",
+      "order": 4,
+      "enabled": true
+    },
+    {
+      "id":  "pixcel_status",
+      "description":  "Pixcel",
+      "command": "systemctl status pixcell",
+      "format": "icon",
+      "order": 5,
+      "enabled": true
+    },
+    {
+      "id": "rc_local_status",
+      "description":  "RC. Local",
+      "command": "systemctl status rc. local",
+      "format": "icon",
+      "order": 6,
+      "enabled": true
+    },
+    {
+      "id": "analyzer_network",
+      "description": "Network eth1",
+      "command": "ip link show eth1",
+      "format": "extract",
+      "order": 7,
+      "enabled": true
+    },
+    {
+      "id": "health_status",
+      "description": "Health",
+      "command": "/opt/LisProxy/scripts/SendHealth.sh",
+      "format":  "icon",
+      "order":  8,
+      "enabled":  true
+    }
+  ]
+}
