@@ -9,9 +9,9 @@ import Config
 config :system_monitor, SystemMonitorWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}],
+  http: [ip: {0, 0, 0, 0}],
   check_origin: false,
-  code_reloader: true,
+  code_reloader: false,
   debug_errors: true,
   secret_key_base: "JwZpy8KJFJyZ+WHpy1QGuddtv1b97nA0dd6o8ZLSOpRmxQckIQjdIZ0rCMtVc1lY",
   watchers: [
@@ -60,8 +60,11 @@ config :system_monitor, SystemMonitorWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :system_monitor, dev_routes: true
 
+# Set the global logger level
+config :logger, level: :info
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
+
 
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
