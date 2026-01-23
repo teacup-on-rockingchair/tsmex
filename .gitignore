@@ -43,3 +43,4 @@ npm-debug.log
 # System monitor specific
 systems.json
 commands.json
+.env
