@@ -41,11 +41,11 @@ defmodule SystemMonitorWeb.DashboardLive do
   end
 
   def handle_info({:system_updated, _system_name, _timestamp}, socket) do
-    {:noreply, systems: load_systems()}
+    {:noreply, assign(socket, systems: load_systems())}
   end
 
   def handle_info({:system_check_failed, _system_name, _timestamp}, socket) do
-    {:noreply, systems: load_systems()}
+    {:noreply, assign(socket, systems: load_systems())}
   end
 
   @impl true
