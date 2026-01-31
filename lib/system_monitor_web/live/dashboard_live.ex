@@ -4,7 +4,7 @@ defmodule SystemMonitorWeb.DashboardLive do
   alias SystemMonitor.Storage.Records
   alias SystemMonitor.Config.Loader
   alias SystemMonitorWeb.DashboardLive.SystemHealth
-
+  require Logger
   @refresh_interval 5_000
 
   # ============================================================================
@@ -14,26 +14,75 @@ defmodule SystemMonitorWeb.DashboardLive do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      schedule_refresh()
+      Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+      Logger.info("Starting refresh timer")
+    else
+      Logger.info("Not connected, skipping timer")
     end
 
-    socket =
-      socket
-      |> load_initial_data()
-      |> assign_last_update()
-      |> assign(expanded_systems: MapSet.new())
+    case Loader.load_commands_config() do
+      {:ok, commands} ->
+        {:ok,
+         socket
+         |> assign(systems: load_systems())
+         |> assign(commands: commands)
+         # Track expanded/collapsed state
+         |> assign(expanded_systems: MapSet.new())}
 
-    {:ok, socket}
+      {:error, _} ->
+        {:ok,
+         socket
+         |> assign(systems: [])
+         |> assign(commands: [])
+         # Track expanded/collapsed state
+         |> assign(expanded_systems: MapSet.new())
+         |> put_flash(:error, "Failed to load commands configuration")}
+    end
+  end
+
+  def handle_info({:system_updated, _system_name, _timestamp}, socket) do
+    {:noreply, systems: load_systems()}
+  end
+
+  def handle_info({:system_check_failed, _system_name, _timestamp}, socket) do
+    {:noreply, systems: load_systems()}
   end
 
   @impl true
   def handle_info(:refresh, socket) do
-    socket =
-      socket
-      |> assign(systems: load_systems())
-      |> assign_last_update()
+    try do
+      Logger.info("Refresh triggered!")
 
-    {:noreply, socket}
+      socket =
+        socket
+        |> assign(systems: load_systems())
+        |> assign_last_update()
+
+      {:noreply, socket}
+    rescue
+      error ->
+        Logger.error("""
+        ❌ Refresh FAILED!
+        Error: #{Exception.message(error)}
+
+        Stacktrace:
+        #{Exception.format_stacktrace(__STACKTRACE__)}
+        """)
+
+        # Don't crash, just skip this refresh
+        {:noreply, socket}
+    catch
+      kind, reason ->
+        Logger.error("""
+        ❌ Refresh CAUGHT #{kind}!
+        Reason: #{inspect(reason)}
+
+        Stacktrace:
+        #{Exception.format_stacktrace(__STACKTRACE__)}
+        """)
+
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -316,6 +365,17 @@ defmodule SystemMonitorWeb.DashboardLive do
       diff_seconds < 2_592_000 -> "#{div(diff_seconds, 86400)}d ago"
       diff_seconds < 31_536_000 -> "#{div(diff_seconds, 2_592_000)}mo ago"
       true -> "#{div(diff_seconds, 31_536_000)}y ago"
+    end
+  end
+
+  defp time_ago_class(timestamp) do
+    minutes_ago = DateTime.diff(DateTime.utc_now(), timestamp, :minute)
+
+    cond do
+      minutes_ago < 5 -> "text-green-600"
+      minutes_ago < 15 -> "text-gray-600"
+      minutes_ago < 60 -> "text-yellow-600"
+      true -> "text-red-600"
     end
   end
 

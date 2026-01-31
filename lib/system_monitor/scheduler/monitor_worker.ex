@@ -35,8 +35,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   end
 
   def handle_info(:check_system, state) do
-    perform_health_check(state)
     schedule_next_check()
+    perform_health_check(state)
     {:noreply, state}
   end
 
@@ -148,7 +148,12 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     }
 
     Records.store(record)
-
+    # Broadcast that data changed
+    Phoenix.PubSub.broadcast(
+      SystemMonitor.PubSub,
+      "system_updates",
+      {:system_updated, system.name, record}
+    )
     Logger.info(
       "✓ #{system.name}:  Health check completed - stored #{success_count}/#{total_count} results"
     )
