@@ -111,11 +111,30 @@ defmodule SystemMonitor.SSH.Client do
       {:ssh_cm, ^conn, {:exit_status, ^channel_id, _status}} ->
         receive_output(conn, channel_id, acc, timeout)
 
+      {:ssh_cm, ^conn, {:eof, ^channel_id}} ->
+        Logger.debug("EOF received on channel #{channel_id}")
+        # EOF means no more data, keep waiting for :closed
+        receive_output(conn, channel_id, acc, timeout)
+
       {:ssh_cm, ^conn, {:closed, ^channel_id}} ->
+        Logger.debug("Channel #{channel_id} closed, output length: #{String.length(acc)}")
         {:ok, acc}
     after
       timeout ->
+        Logger.error("Command timeout after #{timeout}ms")
+        # Flush any remaining SSH messages for this channel
+        flush_ssh_messages(conn, channel_id)
         {:error, :timeout}
+    end
+  end
+
+  # Add this helper function
+  defp flush_ssh_messages(conn, channel_id) do
+    receive do
+      {:ssh_cm, ^conn, {_type, ^channel_id, _data}} ->
+        flush_ssh_messages(conn, channel_id)
+    after
+      0 -> :ok
     end
   end
 end
