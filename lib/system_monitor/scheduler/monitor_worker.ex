@@ -10,7 +10,6 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   alias SystemMonitor.SSH.CommandRunner
   alias SystemMonitor.Storage.Records
   alias SystemMonitor.Formatter.OutputFormatter
-  alias SystemMonitor.Config.{Systems, Commands}
 
   @min_delay 10
   @max_delay 1800
@@ -161,7 +160,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Log when storage is skipped due to all failures
   defp log_skipped_storage(system_name, total_count) do
-    Logger.warn(
+    Logger.warning(
       "✗ #{system_name}: Health check completed - skipped storage " <>
         "(all #{total_count} commands failed, likely SSH connection issue)"
     )
