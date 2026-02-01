@@ -68,7 +68,7 @@ defmodule SystemMonitorWeb.CoreComponents do
         <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
         <div>
           <p :if={@title} class="font-semibold"><%= @title %></p>
-          <p><%= assigns[:msg] %></p>
+          <p><%= msg %></p>
         </div>
         <div class="flex-1" />
         <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
@@ -182,7 +182,7 @@ defmodule SystemMonitorWeb.CoreComponents do
                 multiple pattern placeholder readonly required rows size step)
 
   def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
-    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+    errors = field.errors
 
     assigns
     |> assign(field: nil, id: assigns.id || field.id)
@@ -226,7 +226,7 @@ defmodule SystemMonitorWeb.CoreComponents do
           />{@label}
         </span>
       </label>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <.error :for={msg <- @errors}><%= msg %></.error>
     </div>
     """
   end
@@ -247,7 +247,7 @@ defmodule SystemMonitorWeb.CoreComponents do
           {Phoenix.HTML.Form.options_for_select(@options, @value)}
         </select>
       </label>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <.error :for={msg <- @errors}><%= msg %></.error>
     </div>
     """
   end
@@ -267,7 +267,7 @@ defmodule SystemMonitorWeb.CoreComponents do
           {@rest}
         >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
       </label>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <.error :for={msg <- @errors}><%= msg %></.error>
     </div>
     """
   end
@@ -290,7 +290,7 @@ defmodule SystemMonitorWeb.CoreComponents do
           {@rest}
         />
       </label>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <.error :for={msg <- @errors}><%= msg %></.error>
     </div>
     """
   end
@@ -363,7 +363,7 @@ defmodule SystemMonitorWeb.CoreComponents do
     <table class="table table-zebra">
       <thead>
         <tr>
-          <th :for={col <- @col}>{col[:label]}</th>
+          <th :for={col <- @col}><%= col[:label] %></th>
           <th :if={@action != []}>
             <span class="sr-only">{gettext("Actions")}</span>
           </th>
@@ -376,12 +376,12 @@ defmodule SystemMonitorWeb.CoreComponents do
             phx-click={@row_click && @row_click.(row)}
             class={@row_click && "hover:cursor-pointer"}
           >
-            {render_slot(col, @row_item.(row))}
+            <% render_slot(col, @row_item.(row)) %>
           </td>
           <td :if={@action != []} class="w-0 font-semibold">
             <div class="flex gap-4">
               <%= for action <- @action do %>
-                {render_slot(action, @row_item.(row))}
+                <%= render_slot(action, @row_item.(row)) %>
               <% end %>
             </div>
           </td>
@@ -411,7 +411,7 @@ defmodule SystemMonitorWeb.CoreComponents do
       <li :for={item <- @item} class="list-row">
         <div class="list-col-grow">
           <div class="font-bold">{item.title}</div>
-          <div>{render_slot(item)}</div>
+          <div><%= render_slot(item) %></div>
         </div>
       </li>
     </ul>
