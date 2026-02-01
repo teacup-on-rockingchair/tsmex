@@ -64,7 +64,6 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
     required_result =
       Enum.all?(required_services, fn service_key ->
         get_command_result(system_data, service_key)
-        #        |> tap(&Logger.info("Service #{service_key} status for #{system_data.system_name} is #{inspect(&1)}"))
         |> case do
           nil -> false
           result -> not has_error?(result)
