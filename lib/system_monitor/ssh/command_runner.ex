@@ -85,24 +85,6 @@ defmodule SystemMonitor.SSH.CommandRunner do
     String.replace(command, "'", "'\\''")
   end
 
-  defp prepare_command(system, command) do
-    sudo_password = Map.get(system, :sudo_password)
-
-    cond do
-      # No sudo password configured - run command as-is
-      is_nil(sudo_password) ->
-        {command, nil}
-
-      # Command already has sudo - keep as-is but provide password
-      String.starts_with?(command, "sudo") ->
-        {command, sudo_password}
-
-      # Add sudo -S and provide password
-      true ->
-        {"sudo -S #{command}", sudo_password}
-    end
-  end
-
   defp clean_sudo_output(output) do
     output
     |> String.replace(~r/^.*Read-only file system.*/m, "")
