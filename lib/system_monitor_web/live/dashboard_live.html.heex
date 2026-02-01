@@ -81,7 +81,7 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
           <%= for system <- @systems do %>
-            <tr class={"transition-colors #{SystemHealth.health_color_class(SystemHealth.health_status(system))}"}>
+            <tr class={"transition-colors #{SystemHealth.health_color_class(SystemHealth.health_status(system, @services))}"}>
               <td class="px-4 py-3 border-b">
                 <.link
                   navigate={~p"/systems/#{system.system_name}"}
@@ -91,8 +91,8 @@
                 </.link>
               </td>
               <td class="px-4 py-3 border-b">
-                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{status_badge_class(SystemHealth.health_status(system))}"}>
-                  <%= status_text(SystemHealth.health_status(system)) %>
+                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{status_badge_class(SystemHealth.health_status(system, @services))}"}>
+                  <%= status_text(SystemHealth.health_status(system, @services)) %>
                 </span>
               </td>
               <td class="px-4 py-3 text-sm text-gray-600 border-b">
@@ -116,7 +116,7 @@
     <!-- Mobile/Tablet View: Collapsible Cards (hidden on desktop) -->
     <div class="lg:hidden space-y-3">
       <%= for system <- @systems do %>
-        <% health = SystemHealth.health_status(system) %>
+        <% health = SystemHealth.health_status(system, @services) %>
         <div class={"rounded-lg shadow overflow-hidden transition-all #{SystemHealth.health_color_class(health)}"}>
           <!-- Card Header (Always Visible) -->
           <button

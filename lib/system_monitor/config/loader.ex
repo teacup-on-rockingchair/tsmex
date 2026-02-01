@@ -5,6 +5,26 @@ defmodule SystemMonitor.Config.Loader do
 
   require Logger
 
+  def load_services_config do
+    path = get_services_config_path()
+    case File.read(path) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"required_services" => required_services,
+                 "optional_services" => optional_services}} ->
+            {:ok, %{required: required_services, optional: optional_services}}
+
+          {:error, error} ->
+            Logger.error("Failed to parse services config: #{inspect(error)}")
+            {:error, :invalid_json}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to read services config from #{path}: #{inspect(reason)}")
+        {:error, :file_not_found}
+    end
+  end
+
   def load_systems_config do
     path = get_systems_config_path()
 
@@ -38,11 +58,15 @@ defmodule SystemMonitor.Config.Loader do
             Logger.error("Failed to parse commands config: #{inspect(error)}")
             {:error, :invalid_json}
         end
-
       {:error, reason} ->
         Logger.error("Failed to read commands config from #{path}:  #{inspect(reason)}")
         {:error, :file_not_found}
     end
+  end
+
+  defp get_services_config_path do
+    System.get_env("SERVICES_CONFIG_PATH") ||
+      Path.expand("~/.system_monitor/services.json")
   end
 
   defp get_systems_config_path do

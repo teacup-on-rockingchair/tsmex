@@ -9,11 +9,10 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
   """
   require Logger
 
-  def health_status(system_data) do
+  def health_status(system_data, services) do
     cond do
       is_critically_stale?(system_data) -> :red
-      is_healthy?(system_data) -> :green
-      #      true -> :green
+      is_healthy?(system_data, services) -> :green
       true -> :yellow
     end
   end
@@ -38,9 +37,9 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
   end
 
   # Green: All conditions met
-  defp is_healthy?(system_data) do
+  defp is_healthy?(system_data, services) do
     within_two_hours?(system_data) and
-      all_services_healthy?(system_data) and
+      all_services_healthy?(system_data, services) and
       network_healthy?(system_data)
   end
 
@@ -57,45 +56,29 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
     end
   end
 
-  # Check if lis1, lis2, pixcell, rc-local show no errors
-  defp all_services_healthy?(system_data) do
-    required_services = ["lis1_status", "rc_local_status"]
+  defp check_service_healthy?(system_data, service_key) do
+    get_command_result(system_data, service_key)
+    |> case do
+      nil -> false
+      result -> not has_error?(result)
+    end
+  end
+
+  # Check if required services are all ok or at least one of the optionals show no errors
+  defp all_services_healthy?(system_data, services) do
+    required_services = services[:required]
 
     required_result =
       Enum.all?(required_services, fn service_key ->
-        get_command_result(system_data, service_key)
-        |> case do
-          nil -> false
-          result -> not has_error?(result)
-        end
+        check_service_healthy?(system_data, service_key)
       end)
 
-    optional_services = ["lis2_status", "pixcell_status"]
+    optional_services = services[:optional]
 
     optional_result =
       Enum.any?(optional_services, fn service_key ->
-        get_command_result(system_data, service_key)
-        |> tap(
-          &Logger.info(
-            "Optional Service #{service_key} status for #{system_data.system_name} is #{inspect(&1)}"
-          )
-        )
-        |> case do
-          nil ->
-            false
-
-          result ->
-            Logger.info(
-              "Optional Service #{service_key} result for #{system_data.system_name} is #{inspect(result)} and that is #{not has_error?(result)}"
-            )
-
-            not has_error?(result)
-        end
-      end)
-
-    Logger.info(
-      "System #{system_data.system_name} required services healthy: #{required_result}, optional services healthy: #{optional_result}"
-    )
+        check_service_healthy?(system_data, service_key)
+      end) or optional_services
 
     required_result and optional_result
   end
