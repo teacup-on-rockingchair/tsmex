@@ -78,7 +78,7 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
     optional_result =
       Enum.any?(optional_services, fn service_key ->
         check_service_healthy?(system_data, service_key)
-      end) or optional_services
+      end)
 
     required_result and optional_result
   end
