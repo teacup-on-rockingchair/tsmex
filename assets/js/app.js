@@ -25,10 +25,14 @@ import {LiveSocket} from "phoenix_live_view"
 // import {hooks as colocatedHooks} from "phoenix-colocated/system_monitor"
 import topbar from "../vendor/topbar"
 
+// Use hooks to handle file downloads
+let Hooks = {};
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
+    params: {_csrf_token: csrfToken},
+    hooks: Hooks
   // hooks: {...colocatedHooks},
 })
 
@@ -81,3 +85,59 @@ if (process.env.NODE_ENV === "development") {
   })
 }
 
+// Copy to clipboard hook
+window.addEventListener("phx:copy", (event) => {
+  const text = event.detail.text;
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      console.log("Copied to clipboard");
+    }).catch(err => {
+      console.error("Failed to copy:", err);
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+});
+
+function fallbackCopy(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  
+  try {
+    document.execCommand("copy");
+    console.log("Copied using fallback method");
+  } catch (err) {
+    console.error("Fallback copy failed:", err);
+  }
+  
+  document.body.removeChild(textarea);
+}
+
+Hooks.FileDownload = {
+  mounted() {
+    console.log("FileDownload hook mounted");
+    
+    this.handleEvent("download_file", ({filename, content}) => {
+      console.log("Download hook received:", filename);
+      
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log("Download completed:", filename);
+    });
+  }
+};
