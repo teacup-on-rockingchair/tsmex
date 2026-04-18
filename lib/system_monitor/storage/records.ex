@@ -9,7 +9,7 @@ defmodule SystemMonitor.Storage.Records do
 
   @max_records_per_system 30
   @dets_dir "priv/data"
-  @health_records_file "health_records. dets"
+  @health_records_file "health_records.dets"
   @system_states_file "system_states.dets"
 
   def start_link(_) do
@@ -24,35 +24,37 @@ defmodule SystemMonitor.Storage.Records do
     health_records_path = Path.join(@dets_dir, @health_records_file)
     system_states_path = Path.join(@dets_dir, @system_states_file)
 
-    case :dets.open_file(:health_records, [
+    case :dets.open_file(:health_records,
            type: :set,
            file: String.to_charlist(health_records_path)
-         ]) do
+         ) do
       {:ok, :health_records} ->
-        Logger. info("Opened health_records DETS table:  #{health_records_path}")
+        Logger.info("Opened health_records DETS table:  #{health_records_path}")
 
       {:error, reason} ->
         Logger.error("Failed to open health_records DETS:  #{inspect(reason)}")
         raise "Could not open health_records DETS table"
     end
 
-    case :dets.open_file(:system_states, [
+    case :dets.open_file(:system_states,
            type: :set,
-           file: String. to_charlist(system_states_path)
-         ]) do
+           file: String.to_charlist(system_states_path)
+         ) do
       {:ok, :system_states} ->
         Logger.info("Opened system_states DETS table: #{system_states_path}")
-        
+
         # Log existing systems on startup
-        existing_systems = 
+        existing_systems =
           :dets.foldl(
             fn {system_name, _state}, acc -> [system_name | acc] end,
             [],
             :system_states
           )
-        
+
         if length(existing_systems) > 0 do
-          Logger.info("Restored data for #{length(existing_systems)} systems:  #{inspect(existing_systems)}")
+          Logger.info(
+            "Restored data for #{length(existing_systems)} systems:  #{inspect(existing_systems)}"
+          )
         end
 
       {:error, reason} ->
@@ -130,10 +132,33 @@ defmodule SystemMonitor.Storage.Records do
     system_name = record.system_name
 
     # Store in history
-    store_in_history(system_name, record)
+    result = store_in_history(system_name, record)
 
     # Update system state
     update_system_state(system_name, record)
+
+    # ✅ Broadcast AFTER storage completes
+    case result do
+      :ok ->
+        Logger.debug("✅ Stored, broadcasting update for #{system_name}")
+
+        Phoenix.PubSub.broadcast(
+          SystemMonitor.PubSub,
+          "system_updates",
+          {:system_updated, system_name, record.timestamp}
+        )
+
+        Logger.debug("📤 Broadcast complete for #{system_name}")
+
+      {:error, reason} ->
+        Logger.error("❌ Store failed for #{system_name}: #{inspect(reason)}")
+
+        Phoenix.PubSub.broadcast(
+          SystemMonitor.PubSub,
+          "system_updates",
+          {:system_check_failed, system_name, record.timestamp}
+        )
+    end
 
     Logger.debug("Stored health record for #{system_name}")
 
@@ -148,15 +173,30 @@ defmodule SystemMonitor.Storage.Records do
   end
 
   defp store_in_history(system_name, record) do
-    existing =
-      case :dets.lookup(:health_records, system_name) do
-        [{^system_name, records}] -> records
-        [] -> []
-      end
+    try do
+      existing =
+        case :dets.lookup(:health_records, system_name) do
+          [{^system_name, records}] -> records
+          [] -> []
+        end
 
-    updated = [record | existing] |> Enum.take(@max_records_per_system)
-    :dets.insert(:health_records, {system_name, updated})
-    :dets.sync(:health_records)  # Force write to disk
+      updated = [record | existing] |> Enum.take(@max_records_per_system)
+      :dets.insert(:health_records, {system_name, updated})
+      # Force write to disk
+      case :dets.sync(:health_records) do
+        :ok ->
+          Logger.debug("✅ DETS synced for #{system_name}")
+          :ok
+
+        {:error, reason} ->
+          Logger.error("❌ DETS sync failed: #{inspect(reason)}")
+          {:error, :sync_failed}
+      end
+    rescue
+      error ->
+        Logger.error("❌ Storage exception: #{inspect(error)}")
+        {:error, error}
+    end
   end
 
   defp update_system_state(system_name, new_record) do
@@ -169,9 +209,12 @@ defmodule SystemMonitor.Storage.Records do
 
     # Merge new results with existing known states
     updated_results =
-      Enum.reduce(new_record.results, existing_state. results, fn {cmd_id, new_cmd_data}, acc ->
+      Enum.reduce(new_record.results, existing_state.results, fn {cmd_id, new_cmd_data}, acc ->
         existing_cmd_data = Map.get(acc, cmd_id)
-        updated_cmd_data = merge_command_state(existing_cmd_data, new_cmd_data, new_record.timestamp)
+
+        updated_cmd_data =
+          merge_command_state(existing_cmd_data, new_cmd_data, new_record.timestamp)
+
         Map.put(acc, cmd_id, updated_cmd_data)
       end)
 
@@ -183,7 +226,8 @@ defmodule SystemMonitor.Storage.Records do
     }
 
     :dets.insert(:system_states, {system_name, updated_state})
-    :dets.sync(:system_states)  # Force write to disk
+    # Force write to disk
+    :dets.sync(:system_states)
   end
 
   defp init_system_state(system_name) do
@@ -196,7 +240,7 @@ defmodule SystemMonitor.Storage.Records do
 
   defp merge_command_state(existing, new, check_time) do
     # Check if new result is valid (not an error/timeout)
-    new_is_valid = is_valid_result?(new. result)
+    new_is_valid = is_valid_result?(new.result)
 
     cond do
       # No existing data - use new data regardless

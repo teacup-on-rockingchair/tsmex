@@ -11,8 +11,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   alias SystemMonitor.Storage.Records
   alias SystemMonitor.Formatter.OutputFormatter
 
-  @min_delay 10
-  @max_delay 1800
+  @min_delay 300
+  @max_delay 7200
 
   @min_delay_first 1
   @max_delay_first 30
@@ -29,13 +29,32 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   def init({system_config, commands_config}) do
     Logger.info("Starting monitor worker for #{system_config.name}")
+    # Subscribe to worker commands
+    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "worker_commands")
+    Logger.info("📡 Subscribed to worker_commands")
     schedule_first_check()
     {:ok, %{system: system_config, commands: commands_config}}
   end
 
+  @impl true
   def handle_info(:check_system, state) do
     schedule_next_check()
     perform_health_check(state)
+    {:noreply, state}
+  end
+
+  # Handle immediate check request from PubSub
+  @impl true
+  def handle_info({:trigger_check, system_name}, %{system: system} = state) do
+    if system.name == system_name do
+      Logger.info("🚀 Immediate check triggered for #{system_name}")
+
+      # Perform health check immediately
+      perform_health_check(state)
+    else
+      Logger.debug("📭 Ignoring trigger for #{system_name} (I'm #{system.name})")
+    end
+
     {:noreply, state}
   end
 
@@ -55,11 +74,30 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     Logger.info("Starting health check for #{system.name}")
     check_timestamp = DateTime.utc_now()
 
-    # Execute all commands
-    results_with_status = execute_all_commands(system, commands, check_timestamp)
+    try do
+      # Execute all commands
+      results_with_status = execute_all_commands(system, commands, check_timestamp)
 
-    # Store results only if at least one succeeded
-    store_results_if_successful(system, results_with_status, check_timestamp)
+      # Store results only if at least one succeeded
+      store_results_if_successful(system, results_with_status, check_timestamp)
+    rescue
+      error ->
+        Logger.error("""
+        ❌ Health check failed for #{system.name}
+        Error: #{inspect(error)}
+        Type: #{error.__struct__}
+
+        This was likely a storage, formatting, or configuration error.
+        Worker continues running.
+        """)
+
+        # Notify of failure
+        Phoenix.PubSub.broadcast(
+          SystemMonitor.PubSub,
+          "system_updates",
+          {:system_check_failed, system.name, DateTime.utc_now()}
+        )
+    end
   end
 
   # Execute all commands and track success for each
@@ -124,7 +162,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     if success_count > 0 do
       do_store_results(system, results_with_status, timestamp, success_count, total_count)
     else
-      log_skipped_storage(system.name, total_count)
+      log_skipped_storage(system.name, timestamp, total_count)
     end
   end
 
@@ -147,23 +185,23 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     }
 
     Records.store(record)
-    # Broadcast that data changed
-    Phoenix.PubSub.broadcast(
-      SystemMonitor.PubSub,
-      "system_updates",
-      {:system_updated, system.name, record}
-    )
+
     Logger.info(
       "✓ #{system.name}:  Health check completed - stored #{success_count}/#{total_count} results"
     )
   end
 
   # Log when storage is skipped due to all failures
-  defp log_skipped_storage(system_name, total_count) do
+  defp log_skipped_storage(system_name, timestamp, total_count) do
     Logger.warning(
       "✗ #{system_name}: Health check completed - skipped storage " <>
         "(all #{total_count} commands failed, likely SSH connection issue)"
     )
-  end
 
+    Phoenix.PubSub.broadcast(
+      SystemMonitor.PubSub,
+      "system_updates",
+      {:system_check_failed, system_name, timestamp}
+    )
+  end
 end
