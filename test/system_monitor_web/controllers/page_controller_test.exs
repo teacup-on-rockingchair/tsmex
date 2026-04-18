@@ -3,6 +3,7 @@ defmodule SystemMonitorWeb.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Peace of mind from prototype to production"
+    conn = get(conn, redirected_to(conn))
+    assert html_response(conn, 200) =~ "System Monitor Login"
   end
 end
