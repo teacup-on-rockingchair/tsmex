@@ -59,6 +59,14 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     {:noreply, assign(socket, :expanded_checks, new_expanded)}
   end
 
+  def handle_event("copy_to_clipboard", %{"text" => text_str}, socket) do
+     {:noreply,
+       socket
+       |> assign(:loading, false)
+       |>put_flash(:info, "About to copy #{text_str}")}
+#    {:noreply, socket}
+  end
+
   # Manual refresh (trigger new health check)
   def handle_event("refresh", _params, socket) do
     system_name = socket.assigns.system_name
@@ -292,8 +300,7 @@ defmodule SystemMonitorWeb.SystemDetailLive do
           <.icon name="hero-arrows-pointing-out" class="h-3 w-3 mr-1" /> Scroll to see more
         </span>
         <button
-          phx-click="copy_to_clipboard"
-          phx-value-text={@text}
+          phx-click={JS.dispatch("phx:copy")}
           class="flex items-center text-blue-600 hover:text-blue-800"
         >
           <.icon name="hero-clipboard" class="h-3 w-3 mr-1" /> Copy

@@ -87,18 +87,23 @@ if (process.env.NODE_ENV === "development") {
 
 // Copy to clipboard hook
 window.addEventListener("phx:copy", (event) => {
-  const text = event.detail.text;
-  
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      console.log("Copied to clipboard");
-    }).catch(err => {
-      console.error("Failed to copy:", err);
-      fallbackCopy(text);
-    });
-  } else {
-    fallbackCopy(text);
-  }
+    const copy_button = event.target;
+    const text_div = copy_button.parentElement.parentElement
+          .querySelector(
+              ".overflow-auto.max-h-64.rounded.border.border-gray-300.bg-gray-50"
+          );
+
+    if( !text_div ) return;
+    const text = text_div.textContent;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {}).catch(
+            err => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
 });
 
 function fallbackCopy(text) {
@@ -108,7 +113,7 @@ function fallbackCopy(text) {
   textarea.style.opacity = "0";
   document.body.appendChild(textarea);
   textarea.select();
-  
+
   try {
     document.execCommand("copy");
     console.log("Copied using fallback method");
