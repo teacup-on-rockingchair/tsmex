@@ -231,50 +231,43 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     """
   end
 
+  defp render_status_badge(%{result: %{type: :icon, value: status}}) do
+    assigns = %{status: status}
+
+    ~H"""
+    <%= case @status do %>
+      <% :ok -> %>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          ✓ OK
+        </span>
+      <% :warning -> %>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          ⚠ Warning
+        </span>
+      <% :error -> %>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          ✗ Error
+        </span>
+      <% _ -> %>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          ? Unknown
+        </span>
+    <% end %>
+    """
+  end
+
   defp render_status_badge(_), do: nil
 
-  defp render_command_output(%{type: :raw, display: text}) do
-    assigns = %{text: text}
 
-    ~H"""
-    <pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto"><%= @text %></pre>
-    """
-  end
-
-  defp render_command_output(%{type: :extract, display: text, raw_output: raw}) do
-    assigns = %{text: text, raw: raw}
-
-    ~H"""
-    <div>
-      <p class="text-sm text-gray-700"><%= @text %></p>
-      <details class="mt-2">
-        <summary class="text-xs text-blue-600 cursor-pointer">Show full output</summary>
-        <pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto mt-2"><%= @raw %></pre>
-      </details>
-    </div>
-    """
-  end
-
-  defp render_command_output(%{type: :icon, raw_output: raw}) do
-    assigns = %{raw: raw}
-
-    ~H"""
-    <details>
-      <summary class="text-xs text-blue-600 cursor-pointer">Show output</summary>
-      <pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto mt-2"><%= @raw %></pre>
-    </details>
-    """
-  end
-
-  defp render_result_content(%{result: result, format: format} = _result_data) do
+  defp render_result_content(%{result: result, format: _format} = _result_data) do
     case result do
       %{type: :raw, display: display} ->
         render_scrollable_text(display)
 
-      %{type: :extract, display: display} ->
+      %{type: :extract, display: _display} ->
         render_scrollable_text(result.raw_output)
 
-      %{type: :icon, value: status} ->
+      %{type: :icon, value: _status} ->
         render_scrollable_text(result.raw_output)
 
       text when is_binary(text) ->
@@ -310,67 +303,6 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     """
   end
 
-  defp render_extracted_value(display) do
-    assigns = %{display: display}
-
-    ~H"""
-    <div class="text-center py-6">
-      <div class="text-4xl sm:text-5xl font-bold text-blue-600">
-        <%= @display %>
-      </div>
-      <p class="text-xs text-gray-500 mt-2">Extracted Value</p>
-    </div>
-    """
-  end
-
-  defp render_status_icon(status) do
-    assigns = %{status: status}
-
-    ~H"""
-    <div class="text-center py-8">
-      <%= case @status do %>
-        <% :ok -> %>
-          <.icon name="hero-check-circle" class="h-16 w-16 text-green-500 mx-auto" />
-          <p class="text-sm font-medium text-green-700 mt-2">Healthy</p>
-        <% :warning -> %>
-          <.icon name="hero-exclamation-triangle" class="h-16 w-16 text-yellow-500 mx-auto" />
-          <p class="text-sm font-medium text-yellow-700 mt-2">Warning</p>
-        <% :error -> %>
-          <.icon name="hero-x-circle" class="h-16 w-16 text-red-500 mx-auto" />
-          <p class="text-sm font-medium text-red-700 mt-2">Error</p>
-        <% _ -> %>
-          <.icon name="hero-question-mark-circle" class="h-16 w-16 text-gray-500 mx-auto" />
-          <p class="text-sm font-medium text-gray-700 mt-2">Unknown</p>
-      <% end %>
-    </div>
-    """
-  end
-
-  defp render_status_badge(%{result: %{type: :icon, value: status}}) do
-    assigns = %{status: status}
-
-    ~H"""
-    <%= case @status do %>
-      <% :ok -> %>
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          ✓ OK
-        </span>
-      <% :warning -> %>
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          ⚠ Warning
-        </span>
-      <% :error -> %>
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-          ✗ Error
-        </span>
-      <% _ -> %>
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          ? Unknown
-        </span>
-    <% end %>
-    """
-  end
-
   defp time_ago(nil), do: "Never"
 
   defp time_ago(timestamp) do
@@ -390,11 +322,4 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%S UTC")
   end
 
-  defp format_date_group(timestamp) do
-    Calendar.strftime(timestamp, "%B %d, %Y")
-  end
-
-  defp format_time_short(timestamp) do
-    Calendar.strftime(timestamp, "%H:%M:%S")
-  end
 end

@@ -111,7 +111,7 @@
             <div class="border-t border-gray-200">
               <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  <%= for {cmd_id, result} <- check.results do %>
+                  <%= for {_cmd_id, result} <- check.results do %>
                     <div class="bg-gray-50 rounded-lg border border-gray-200">
                       <!-- Card Header -->
                       <div class="p-4 border-b border-gray-200 bg-white">

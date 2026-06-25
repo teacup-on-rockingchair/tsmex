@@ -27,6 +27,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     {:via, Registry, {SystemMonitor.WorkerRegistry, system_name}}
   end
 
+  @impl true
   def init({system_config, commands_config}) do
     Logger.info("Starting monitor worker for #{system_config.name}")
     # Subscribe to worker commands
