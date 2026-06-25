@@ -39,6 +39,7 @@ npm-debug.log
 
 # Configuration files with credentials
 *.json
+!test/support/*.json
 !config/examples/*.example
 
 # System monitor specific

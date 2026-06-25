@@ -1,0 +1,122 @@
+defmodule SystemMonitor.BodyCountTest do
+  use ExUnit.Case, async: true
+
+  alias SystemMonitor.BodyCount
+  alias SystemMonitor.Config. Loader
+
+
+  def ytype(input) do
+    cond do
+      is_atom(input) -> :atom
+      is_list(input) -> :list
+      is_binary(input) -> :binary
+      is_integer(input) -> :integer
+      is_float(input) -> :float
+      is_pid(input) -> :pid
+      is_tuple(input) -> :tuple
+      is_map(input) -> :map
+      is_port(input) -> :port
+      is_bitstring(input) -> :bitstring
+      is_function(input) -> :function
+      true -> :unknown
+    end
+  end
+
+  setup do
+    IO.puts("Setting up BodyCount GenServer for tests...")
+    server_name = make_ref()
+    IO.inspect(server_name, label: "Generated unique server name")
+        System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json") 
+    result = Loader.load_systems_config()
+    IO.inspect(result, label: "Loaded systems configuration result")
+        {:ok, configured_systems} = result
+        IO.puts("Loaded systems configuration: #{inspect(configured_systems)}")
+    start_supervised!({SystemMonitor.BodyCount,  configured_systems})
+    IO.puts("BodyCount GenServer started with name: #{inspect(server_name)}")
+    host_1 = "192.168.1.100"
+    host_2 = "192.168.1.101"
+    host_3 = "192.168.1.103"
+    host_4 = "192.168.1.104"
+    on_exit(fn ->
+      # Cleanup runs after the test, even if it fails
+      SystemMonitor.BodyCount.report_success(host_1)
+      SystemMonitor.BodyCount.report_success(host_2)
+      SystemMonitor.BodyCount.report_success(host_3)
+      SystemMonitor.BodyCount.report_success(host_4)
+    end)
+
+
+    %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
+  end
+
+  test "marks host for rescan after 3 failures", ctx do
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    assert SystemMonitor.BodyCount.get(ctx.host_1) == 3
+    
+    SystemMonitor.BodyCount.report_failure(ctx.host_3)
+    SystemMonitor.BodyCount.report_failure(ctx.host_3)
+    SystemMonitor.BodyCount.report_failure(ctx.host_3)
+    assert SystemMonitor.BodyCount.get(ctx.host_3) == 3
+    
+    assert ctx.host_3 in SystemMonitor.BodyCount.pending_rescans()
+    assert ctx.host_1 in SystemMonitor.BodyCount.pending_rescans()
+    assert ctx.host_2 not in SystemMonitor.BodyCount.pending_rescans()
+    assert ctx.host_4 not in SystemMonitor.BodyCount.pending_rescans()
+  end
+
+  test "resets failure count after successful scan", ctx do
+    SystemMonitor.BodyCount.report_failure(ctx.host_2)
+    SystemMonitor.BodyCount.report_failure(ctx.host_2)
+    assert SystemMonitor.BodyCount.get(ctx.host_2) == 2
+
+    SystemMonitor.BodyCount.report_success(ctx.host_2)
+    assert SystemMonitor.BodyCount.get(ctx.host_2) == 0
+  end
+
+  test "does not mark host for rescan if failures are below threshold", ctx do
+    SystemMonitor.BodyCount.report_failure(ctx.host_4)
+    SystemMonitor.BodyCount.report_failure(ctx.host_4)
+    assert SystemMonitor.BodyCount.get(ctx.host_4) == 2
+    assert ctx.host_4 not in SystemMonitor.BodyCount.pending_rescans()
+  end
+
+  test "handles multiple hosts independently", ctx do
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_2)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_2)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+
+    assert SystemMonitor.BodyCount.get(ctx.host_1) == 3
+    assert SystemMonitor.BodyCount.get(ctx.host_2) == 2
+
+    assert ctx.host_1 in SystemMonitor.BodyCount.pending_rescans()
+    assert ctx.host_2 not in SystemMonitor.BodyCount.pending_rescans()
+  end
+
+  test "starts with zero failures for all configured systems", ctx do
+    assert SystemMonitor.BodyCount.get(ctx.host_1) == 0
+    assert SystemMonitor.BodyCount.get(ctx.host_2) == 0
+    assert SystemMonitor.BodyCount.get(ctx.host_3) == 0
+    assert SystemMonitor.BodyCount.get(ctx.host_4) == 0
+
+    assert SystemMonitor.BodyCount.pending_rescans() == []
+  end
+
+  test "can extract from configuration password for a given system", ctx do
+    assert SystemMonitor.BodyCount.get_password(ctx.host_1) == {:ok, "password1"}
+    assert SystemMonitor.BodyCount.get_password(ctx.host_2) == {:ok, "password2"}
+    assert SystemMonitor.BodyCount.get_password(ctx.host_3) == {:ok, "password3"}
+    assert SystemMonitor.BodyCount.get_password(ctx.host_4) == {:ok, "password4"}
+  end
+  
+  test "initiates rescan for hosts that reach failure threshold", ctx do
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+    SystemMonitor.BodyCount.report_failure(ctx.host_1)
+
+    assert ctx.host_1 in SystemMonitor.BodyCount.pending_rescans()
+  end
+end
