@@ -26,17 +26,17 @@ defmodule SystemMonitor.BodyCountTest do
     IO.puts("Setting up BodyCount GenServer for tests...")
     server_name = make_ref()
     IO.inspect(server_name, label: "Generated unique server name")
-        System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json") 
+    System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json") 
+
     result = Loader.load_systems_config()
-    IO.inspect(result, label: "Loaded systems configuration result")
-        {:ok, configured_systems} = result
-        IO.puts("Loaded systems configuration: #{inspect(configured_systems)}")
+    {:ok, configured_systems} = result
+
     start_supervised!({SystemMonitor.BodyCount,  configured_systems})
-    IO.puts("BodyCount GenServer started with name: #{inspect(server_name)}")
     host_1 = "192.168.1.100"
     host_2 = "192.168.1.101"
     host_3 = "192.168.1.103"
     host_4 = "192.168.1.104"
+
     on_exit(fn ->
       # Cleanup runs after the test, even if it fails
       SystemMonitor.BodyCount.report_success(host_1)
@@ -44,7 +44,6 @@ defmodule SystemMonitor.BodyCountTest do
       SystemMonitor.BodyCount.report_success(host_3)
       SystemMonitor.BodyCount.report_success(host_4)
     end)
-
 
     %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
   end
