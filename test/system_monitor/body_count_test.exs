@@ -4,24 +4,6 @@ defmodule SystemMonitor.BodyCountTest do
   alias SystemMonitor.BodyCount
   alias SystemMonitor.Config.Loader
 
-
-  def ytype(input) do
-    cond do
-      is_atom(input) -> :atom
-      is_list(input) -> :list
-      is_binary(input) -> :binary
-      is_integer(input) -> :integer
-      is_float(input) -> :float
-      is_pid(input) -> :pid
-      is_tuple(input) -> :tuple
-      is_map(input) -> :map
-      is_port(input) -> :port
-      is_bitstring(input) -> :bitstring
-      is_function(input) -> :function
-      true -> :unknown
-    end
-  end
-
   setup do
     IO.puts("Setting up BodyCount GenServer for tests...")
     server_name = make_ref()
@@ -44,7 +26,7 @@ defmodule SystemMonitor.BodyCountTest do
       BodyCount.report_success(host_3)
       BodyCount.report_success(host_4)
     end)
-
+    
     %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
   end
 
@@ -112,6 +94,10 @@ defmodule SystemMonitor.BodyCountTest do
   end
   
   test "initiates rescan for hosts that reach failure threshold", ctx do
+#    expect( SystemMonitor.MockScanner , :scan, fn (Loader.get_ip_range(), "password1") ->
+#      IO.puts("Mock scan initiated for #{ip_address}")
+#      :ok
+#    end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)

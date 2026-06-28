@@ -50,6 +50,12 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Configure Mox for testing
+config :mox, :verify_on_exit!, true
+
+# Configure scanner module for production and test environments
+config :system_monitor, :scanner, SystemMonitor.Scanner
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
