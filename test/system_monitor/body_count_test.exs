@@ -1,6 +1,8 @@
 defmodule SystemMonitor.BodyCountTest do
   use ExUnit.Case, async: true
 
+  import Mox
+
   alias SystemMonitor.BodyCount
   alias SystemMonitor.Config.Loader
 
@@ -9,6 +11,7 @@ defmodule SystemMonitor.BodyCountTest do
     server_name = make_ref()
     IO.inspect(server_name, label: "Generated unique server name")
     System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json") 
+    Mox.set_mox_global()
 
     result = Loader.load_systems_config()
     {:ok, configured_systems} = result
@@ -30,7 +33,12 @@ defmodule SystemMonitor.BodyCountTest do
     %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
   end
 
+  setup :verify_on_exit!
+
   test "marks host for rescan after 3 failures", ctx do
+    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"password1"  ->  "192.168.1.100" end)
+    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"password3"  ->  "192.168.1.100" end)
+
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
@@ -64,6 +72,7 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "handles multiple hosts independently", ctx do
+    expect( SystemMonitor.MockScanner , :scan, 1, fn([_,_],"password1") -> {:ok, "192.168.1.100"} end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_2)
     BodyCount.report_failure(ctx.host_1)
@@ -87,17 +96,17 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "can extract from configuration password for a given system", ctx do
-    assert BodyCount.get_password(ctx.host_1) == {:ok, "password1"}
-    assert BodyCount.get_password(ctx.host_2) == {:ok, "password2"}
-    assert BodyCount.get_password(ctx.host_3) == {:ok, "password3"}
-    assert BodyCount.get_password(ctx.host_4) == {:ok, "password4"}
+    assert BodyCount.get_password(ctx.host_1) == "password1"
+    assert BodyCount.get_password(ctx.host_2) == "password2"
+    assert BodyCount.get_password(ctx.host_3) == "password3"
+    assert BodyCount.get_password(ctx.host_4) == "password4"
   end
   
   test "initiates rescan for hosts that reach failure threshold", ctx do
-#    expect( SystemMonitor.MockScanner , :scan, fn (Loader.get_ip_range(), "password1") ->
-#      IO.puts("Mock scan initiated for #{ip_address}")
-#      :ok
-#    end)
+    expect( SystemMonitor.MockScanner , :scan, fn (["192.168.1.100","192.168.1.110"], "password1") ->
+      IO.puts("Mock scan initiated for password1")
+      {:ok, "192.168.1.100"}
+    end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)

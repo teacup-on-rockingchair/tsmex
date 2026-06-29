@@ -10,10 +10,11 @@ defmodule SystemMonitor.BodyCount do
   require Logger
 
   @doc """
-  Starts the BodyCount GenServer with an optional list of system addresses.
+  Starts the BodyCount GenServer with a system configuration.
+  The system configuration contains a list of systems with their IPs and passwords.
   """ 
-  def start_link(system_addresses \\ []) do
-    GenServer.start_link(__MODULE__, system_addresses, name: __MODULE__)
+  def start_link(system_config \\ %{}) do
+    GenServer.start_link(__MODULE__, system_config, name: __MODULE__)
   end
 
   @doc """
@@ -75,25 +76,28 @@ defmodule SystemMonitor.BodyCount do
   def handle_increment(state, system_ip) do
     counters = state.counters
     config = state.config
-    count = get_counter(counters,system_ip)
-    case count >= 3 do
-      true ->
-        Logger.warning("System #{system_ip} is considered dead. Triggering scanner.")
-        # Trigger scanner logic here (e.g., send message to scanner GenServer)
-        SystemMonitor.scan(config.ip_range, get_password_internal(system_ip, config))
-        counters
-      false ->
-        new_counters =  Enum.map(counters, fn(elem) -> case Map.has_key?(elem, system_ip) do
-                                                         true ->
-                                                           Logger.info("Incrementing counter for system #{system_ip} in map #{inspect(elem)}")
-                                                          Map.update(elem, system_ip, 0 ,&(&1 + 1))
-                                                         false ->
-                                                           Logger.info("No counter for system #{system_ip} in map #{inspect(elem)}. Leaving unchanged.")
-                                                          elem
-                                                      end
-        end)
-        new_counters
+    new_counters =  Enum.map(counters, fn(elem) -> case Map.has_key?(elem, system_ip) do
+                                                     true ->
+                                                       Logger.info("Incrementing counter for system #{system_ip} in map #{inspect(elem)}")
+                                                       Map.update(elem, system_ip, 0 ,&(&1 + 1))
+                                                     false ->
+                                                       Logger.info("No counter for system #{system_ip} in map #{inspect(elem)}. Leaving unchanged.")
+                                                       elem
+                                                   end
+    end)
+
+    if get_counter(new_counters,system_ip) >= 3 do
+      Logger.warning("System #{system_ip} is considered dead. Triggering scanner.")
+      # Trigger scanner logic here (e.g., send message to scanner GenServer)
+      case get_password_internal(system_ip, config) do
+        {:ok, password} ->
+          Logger.info("Password for system #{system_ip} is #{password}. Triggering scanner.")
+          SystemMonitor.scan(config.ip_range, password)
+        {:error, :not_found} ->
+          Logger.error("Password for system #{system_ip} not found. Could not trigger scan.")
+      end
     end
+    new_counters
   end
 
   @doc """
@@ -117,7 +121,7 @@ defmodule SystemMonitor.BodyCount do
 
   @impl true
   def init(systems_config) do
-    systems_counters = Enum.map(systems_config, fn system ->
+    systems_counters = Enum.map(systems_config.systems, fn system ->
       %{ system.ip => 0 }
     end)
     {:ok, %{counters: systems_counters, config: systems_config}}
@@ -166,7 +170,7 @@ defmodule SystemMonitor.BodyCount do
 
   @impl true
   def handle_call({:get_password, system_ip}, _from, state) do
-    password = get_password_internal(system_ip, state.config)
+    {:ok, password} = get_password_internal(system_ip, state.config)
     Logger.info("Password for system #{system_ip} is #{inspect(password)}")
     {:reply, password, state}
   end
@@ -176,7 +180,7 @@ defmodule SystemMonitor.BodyCount do
   Returns the password for the given system_ip from the configuration.
   """
   def get_password_internal(system_ip, config) do
-        case Enum.find(config, fn system -> system.ip == system_ip end) do
+        case Enum.find(config.systems, fn system -> system.ip == system_ip end) do
           nil ->
                 {:error, :not_found}
           system ->

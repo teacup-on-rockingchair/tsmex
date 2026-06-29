@@ -16,7 +16,7 @@ defmodule SystemMonitor. Scheduler.Supervisor do
   def init(:ok) do
     Logger.info("Initializing Monitor Supervisor")
 
-    with {:ok, systems} <- Loader.load_systems_config(),
+    with {:ok, %{ systems: systems, ip_range: _ip_range}} <- Loader.load_systems_config(),
          {:ok, commands} <- Loader.load_commands_config() do
       children =
         Enum.map(systems, fn system ->

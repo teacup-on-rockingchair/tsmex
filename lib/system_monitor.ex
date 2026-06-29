@@ -7,6 +7,7 @@ defmodule SystemMonitor do
   if it comes from the database, an external API or others.
   """
   def scan(ip_address_range, password) do
+    IO.puts("System #{password} is considered dead. Triggering scanner.")
     scanner = Application.fetch_env!(:system_monitor, :scanner)
     scanner.scan(ip_address_range, password)
   end

@@ -31,9 +31,15 @@ defmodule SystemMonitor.Config.Loader do
     case File.read(path) do
       {:ok, content} ->
         case Jason.decode(content) do
-          {:ok, %{"systems" => systems}} ->
-            {:ok, parse_systems(systems)}
+          {:ok, %{"systems" => systems, "ip_range" => ip_range}} ->
+            case parse_ip_range(ip_range) do
+              [] ->
+                Logger.error("Invalid IP range configuration: #{inspect(ip_range)}")
+                {:error, :invalid_ip_range}
 
+              ok_ip_range ->
+                {:ok, %{systems: parse_systems(systems), ip_range: ok_ip_range}}
+            end
           {:error, error} ->
             Logger.error("Failed to parse systems config: #{inspect(error)}")
             {:error, :invalid_json}
@@ -84,6 +90,55 @@ defmodule SystemMonitor.Config.Loader do
     |> Enum.filter(fn system -> Map.get(system, "enabled", true) end)
     |> Enum.map(&SystemMonitor.Config.Systems.from_map/1)
   end
+
+  defp parse_ip_range(ip_range) do
+    ip_range
+    |> parse_ip_range_length()
+    |> parse_ip_range_values()
+  end
+  
+  defp parse_ip_range_length(ip_range) do
+    if ip_range == nil or length(ip_range) != 2 do
+      Logger.error("Invalid IP range configuration: #{inspect(ip_range)}")
+      []
+    else
+      ip_range
+    end
+  end
+
+  defp parse_ip_range_values(ip_range) when ip_range == nil, do: []
+  defp parse_ip_range_values(ip_range) when not is_list(ip_range), do: []
+  defp parse_ip_range_values(ip_range) when length(ip_range) == 0, do: []
+  defp parse_ip_range_values(ip_range) when length(ip_range) != 2, do: []
+  
+  defp parse_ip_range_values(ip_range) do
+        Enum.map(ip_range, fn ip ->
+          case :inet.parse_address(to_charlist(ip)) do
+                {:ok, _} -> ip
+                {:error, _} ->
+                  Logger.error("Invalid IP address in range: #{ip}")
+                  nil
+          end
+        end)
+        |> Enum.filter(& &1) # Remove nil values
+        |> parse_ip_range_values_compare(ip_range)
+  end
+
+  defp parse_ip_range_values_compare(nil, _original_ips), do: []
+  defp parse_ip_range_values_compare([], _original_ips), do: []
+  defp parse_ip_range_values_compare([one_ip], _original_ips), do: []
+
+  defp parse_ip_range_values_compare([start_ip, end_ip], original_ips) do
+    case start_ip > end_ip do
+      true ->
+        Logger.error("Start IP must be less than or equal to End IP in range: #{inspect(original_ips)}")
+        []
+      false ->
+        original_ips
+    end
+  end
+  
+
 
   defp parse_commands(commands) do
     commands
