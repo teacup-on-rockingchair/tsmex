@@ -36,8 +36,8 @@ defmodule SystemMonitor.BodyCountTest do
   setup :verify_on_exit!
 
   test "marks host for rescan after 3 failures", ctx do
-    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"password1"  ->  "192.168.1.100" end)
-    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"password3"  ->  "192.168.1.100" end)
+    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"admin","password1"  ->  "192.168.1.100" end)
+    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"admin","password3"  ->  "192.168.1.100" end)
 
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
@@ -72,7 +72,7 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "handles multiple hosts independently", ctx do
-    expect( SystemMonitor.MockScanner , :scan, 1, fn([_,_],"password1") -> {:ok, "192.168.1.100"} end)
+    expect( SystemMonitor.MockScanner , :scan, 1, fn([_,_],"admin","password1") -> {:ok, "192.168.1.100"} end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_2)
     BodyCount.report_failure(ctx.host_1)
@@ -96,14 +96,14 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "can extract from configuration password for a given system", ctx do
-    assert BodyCount.get_password(ctx.host_1) == "password1"
-    assert BodyCount.get_password(ctx.host_2) == "password2"
-    assert BodyCount.get_password(ctx.host_3) == "password3"
-    assert BodyCount.get_password(ctx.host_4) == "password4"
+    assert BodyCount.get_credentials(ctx.host_1) == {"admin", "password1"} 
+    assert BodyCount.get_credentials(ctx.host_2) == {"admin", "password2"} 
+    assert BodyCount.get_credentials(ctx.host_3) == {"admin", "password3"} 
+    assert BodyCount.get_credentials(ctx.host_4) == {"admin", "password4"} 
   end
   
   test "initiates rescan for hosts that reach failure threshold", ctx do
-    expect( SystemMonitor.MockScanner , :scan, fn (["192.168.1.100","192.168.1.110"], "password1") ->
+    expect( SystemMonitor.MockScanner , :scan, fn (["192.168.1.100","192.168.1.110"], "admin","password1") ->
       IO.puts("Mock scan initiated for password1")
       {:ok, "192.168.1.100"}
     end)

@@ -63,10 +63,10 @@ defmodule SystemMonitor.BodyCount do
   end
 
   @doc """
-        Returns the password for the given system_ip.
+        Returns the user&password for the given system_ip.
   """
-  def get_password(system_ip) do
-    GenServer.call(__MODULE__, {:get_password, system_ip})
+  def get_credentials(system_ip) do
+    GenServer.call(__MODULE__, {:get_credentials, system_ip})
   end
   
   @doc """
@@ -89,10 +89,10 @@ defmodule SystemMonitor.BodyCount do
     if get_counter(new_counters,system_ip) >= 3 do
       Logger.warning("System #{system_ip} is considered dead. Triggering scanner.")
       # Trigger scanner logic here (e.g., send message to scanner GenServer)
-      case get_password_internal(system_ip, config) do
-        {:ok, password} ->
+      case get_credentials_internal(system_ip, config) do
+        {:ok, user, password} ->
           Logger.info("Password for system #{system_ip} is #{password}. Triggering scanner.")
-          SystemMonitor.scan(config.ip_range, password)
+          SystemMonitor.scan(config.ip_range, user, password)
         {:error, :not_found} ->
           Logger.error("Password for system #{system_ip} not found. Could not trigger scan.")
       end
@@ -169,22 +169,22 @@ defmodule SystemMonitor.BodyCount do
   end
 
   @impl true
-  def handle_call({:get_password, system_ip}, _from, state) do
-    {:ok, password} = get_password_internal(system_ip, state.config)
+  def handle_call({:get_credentials, system_ip}, _from, state) do
+    {:ok, user, password} = get_credentials_internal(system_ip, state.config)
     Logger.info("Password for system #{system_ip} is #{inspect(password)}")
-    {:reply, password, state}
+    {:reply, {user, password}, state}
   end
 
   
   @doc """
-  Returns the password for the given system_ip from the configuration.
+  Returns the password and username for the given system_ip from the configuration.
   """
-  def get_password_internal(system_ip, config) do
+  def get_credentials_internal(system_ip, config) do
         case Enum.find(config.systems, fn system -> system.ip == system_ip end) do
           nil ->
                 {:error, :not_found}
           system ->
-                {:ok, system.password}
+                {:ok, system.username ,system.password}
         end
   end
     

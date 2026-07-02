@@ -3,6 +3,6 @@ defmodule SystemMonitor.ScannerBehaviour do
   Behaviour to scan for systems in the network.
   """
 
-  @callback scan(ip_address_range :: String.t(), password :: String.t()) :: String.t()
+  @callback scan(ip_address_range :: String.t(),username :: String.t(), password :: String.t()) :: String.t()
 end
 

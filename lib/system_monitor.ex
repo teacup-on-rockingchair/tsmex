@@ -6,9 +6,9 @@ defmodule SystemMonitor do
   Contexts are also responsible for managing your data, regardless
   if it comes from the database, an external API or others.
   """
-  def scan(ip_address_range, password) do
+  def scan(ip_address_range, username, password) do
     IO.puts("System #{password} is considered dead. Triggering scanner.")
     scanner = Application.fetch_env!(:system_monitor, :scanner)
-    scanner.scan(ip_address_range, password)
+    scanner.scan(ip_address_range, username,password)
   end
 end
