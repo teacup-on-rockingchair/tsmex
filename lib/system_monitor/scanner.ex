@@ -9,7 +9,8 @@ defmodule SystemMonitor.Scanner do
     # Placeholder implementation for the scanner.
     # In a real-world scenario, this function would contain logic to scan the network.
     # For now, it simply returns an empty list to simulate no system found.
-    scan_with_passwords(ip_address_range, username, [password])[0]
+    result = scan_with_passwords(ip_address_range, username, [password])[0]
+    Logger.info("Scan completed for range #{ip_address_range} with username #{username} and password #{password} with result: #{inspect(result)}")
   end
 
   defp scan_with_passwords(ip_range, username, passwords) do
@@ -92,16 +93,6 @@ defmodule SystemMonitor.Scanner do
     end
   rescue
     _ -> :failure
-  end
-
-  # Convert IP address to integer
-  defp ip_to_int(ip_string) do
-    ip_string
-    |> String.split(".")
-    |> Enum.map(&String.to_integer/1)
-    |> case do
-         [a, b, c, d] -> a * 256 * 256 * 256 + b * 256 * 256 + c * 256 + d
-       end
   end
 
   # Convert integer to IP address
