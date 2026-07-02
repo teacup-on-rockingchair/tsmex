@@ -28,6 +28,8 @@ defmodule SystemMonitor.BodyCountTest do
       BodyCount.report_success(host_2)
       BodyCount.report_success(host_3)
       BodyCount.report_success(host_4)
+      System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json")
+
     end)
     
     %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
@@ -112,5 +114,27 @@ defmodule SystemMonitor.BodyCountTest do
     BodyCount.report_failure(ctx.host_1)
 
     assert ctx.host_1 in BodyCount.pending_rescans()
+  end
+
+  test "reloads configuration on demand", ctx do
+
+    BodyCount.report_failure(ctx.host_1)
+    BodyCount.report_failure(ctx.host_1)
+    BodyCount.report_failure(ctx.host_2)
+
+    assert BodyCount.get(ctx.host_1) == 2
+    assert BodyCount.get(ctx.host_2) == 1
+
+    # Simulate a configuration reload
+    System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems_updated.json")
+    {:ok, new_config} = Loader.load_systems_config()
+    BodyCount.reload_configuration(new_config)
+
+    # After reloading, the credentials for host_1 should be updated
+    assert BodyCount.get_credentials(ctx.host_1) == {"admin", "new_password1"}
+
+    assert BodyCount.get(ctx.host_1) == 2
+    assert BodyCount.get(ctx.host_2) == 1
+
   end
 end

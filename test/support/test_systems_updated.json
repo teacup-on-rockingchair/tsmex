@@ -1,0 +1,47 @@
+{
+  "ip_range": [
+    "192.168.1.100",
+    "192.168.1.110"
+  ],
+  "systems": [
+    {
+      "enabled": true,
+      "ip": "192.168.1.100",
+      "name": "analyzer-01",
+      "notes": "Use either 'password' or 'ssh_key_path', not both",
+      "password": "new_password1",
+      "port": 22,
+      "username": "admin"
+    },
+    {
+      "enabled": true,
+      "ip": "192.168.1.101",
+      "name": "analyzer-02",
+      "notes": "SSH key authentication (recommended)",
+      "password": "password2",
+      "port": 22,
+      "ssh_key_path": "/home/user/.ssh/id_rsa",
+      "username": "admin"
+    },
+    {
+      "enabled": true,
+      "ip": "192.168.1.103",
+      "name": "analyzer-03",
+      "notes": "SSH key authentication (recommended)",
+      "password": "password3",
+      "port": 22,
+      "ssh_key_path": "/home/user/.ssh/id_rsa",
+      "username": "admin"
+    },
+    {
+      "enabled": true,
+      "ip": "192.168.1.104",
+      "name": "analyzer-04",
+      "notes": "SSH key authentication (recommended)",
+      "password": "password4",
+      "port": 22,
+      "ssh_key_path": "/home/user/.ssh/id_rsa",
+      "username": "admin"
+    }
+  ]
+}
