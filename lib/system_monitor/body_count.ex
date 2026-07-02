@@ -18,6 +18,13 @@ defmodule SystemMonitor.BodyCount do
   end
 
   @doc """
+  Reloads the system configuration. This can be used to update the list of systems and their passwords.
+  """
+  def reload_configuration(system_config) do
+    GenServer.cast(__MODULE__, {:reload_configuration, system_config})
+  end
+
+  @doc """
   Reports a failure for the given system_ip. Increments the counter for that system.
   """
   def report_failure(ip_address) do
@@ -125,6 +132,13 @@ defmodule SystemMonitor.BodyCount do
       %{ system.ip => 0 }
     end)
     {:ok, %{counters: systems_counters, config: systems_config}}
+  end
+
+  @impl true
+  def handle_cast({:reload_configuration, new_config}, state) do
+    Logger.info("Reloading system configuration.")
+    old_counters = state.counters
+    {:noreply, %{counters: old_counters, config: new_config}}
   end
 
   @impl true
