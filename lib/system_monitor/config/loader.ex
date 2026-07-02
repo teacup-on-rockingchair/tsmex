@@ -51,6 +51,43 @@ defmodule SystemMonitor.Config.Loader do
     end
   end
 
+  def set_new_ip(username, password, new_ip) do
+    path = get_systems_config_path()
+
+    case File.read(path) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"systems" => systems, "ip_range" => ip_range}} ->
+            updated_systems =
+              Enum.map(systems, fn system ->
+                if system["username"] == username and system["password"] == password do
+                  Map.put(system, "ip", new_ip)
+                else
+                  system
+                end
+              end)
+
+            updated_content = %{"systems" => updated_systems, "ip_range" => ip_range}
+            |> Jason.encode!()
+
+            case File.write(path, updated_content) do
+              :ok -> :ok
+              {:error, reason} ->
+                Logger.error("Failed to write updated systems config to #{path}: #{inspect(reason)}")
+                {:error, :write_failed}
+            end
+
+          {:error, error} ->
+            Logger.error("Failed to parse systems config: #{inspect(error)}")
+            {:error, :invalid_json}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to read systems config from #{path}: #{inspect(reason)}")
+        {:error, :file_not_found}
+    end
+  end
+  
   def load_commands_config do
     path = get_commands_config_path()
 
@@ -126,7 +163,7 @@ defmodule SystemMonitor.Config.Loader do
 
   defp parse_ip_range_values_compare(nil, _original_ips), do: []
   defp parse_ip_range_values_compare([], _original_ips), do: []
-  defp parse_ip_range_values_compare([one_ip], _original_ips), do: []
+  defp parse_ip_range_values_compare([_one_ip], _original_ips), do: []
 
   defp parse_ip_range_values_compare([start_ip, end_ip], original_ips) do
     case start_ip > end_ip do
