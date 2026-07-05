@@ -5,6 +5,9 @@ defmodule SystemMonitor.Application do
 
   @impl true
   def start(_type, _args) do
+    result = SystemMonitor.Config.Loader.load_systems_config()
+    {:ok, configured_systems} = result
+
     children = [
       SystemMonitorWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:system_monitor, :dns_cluster_query) || :ignore},
@@ -13,7 +16,8 @@ defmodule SystemMonitor.Application do
       SystemMonitor.Storage.Records,
       SystemMonitor.Scheduler.Supervisor,
       SystemMonitor.SSH.ConnectionPool,
-      SystemMonitorWeb.Endpoint
+      SystemMonitorWeb.Endpoint,
+      {SystemMonitor.BodyCount, configured_systems}
     ]
 
     opts = [strategy: :one_for_one, name: SystemMonitor.Supervisor]
