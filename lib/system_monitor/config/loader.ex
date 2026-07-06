@@ -68,7 +68,7 @@ defmodule SystemMonitor.Config.Loader do
               end)
 
             updated_content = %{"systems" => updated_systems, "ip_range" => ip_range}
-            |> Jason.encode!()
+            |> Jason.encode!(pretty: true)
 
             case File.write(path, updated_content) do
               :ok -> :ok
