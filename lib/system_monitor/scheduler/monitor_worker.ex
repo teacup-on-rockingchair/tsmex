@@ -10,12 +10,15 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   alias SystemMonitor.SSH.CommandRunner
   alias SystemMonitor.Storage.Records
   alias SystemMonitor.Formatter.OutputFormatter
+  alias SystemMonitor.BodyCount
+  alias SystemMonitor.Events
 
   @min_delay 300
   @max_delay 7200
 
   @min_delay_first 1
   @max_delay_first 30
+
 
   def start_link({system_config, commands_config}) do
     GenServer.start_link(__MODULE__, {system_config, commands_config},
@@ -31,10 +34,25 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   def init({system_config, commands_config}) do
     Logger.info("Starting monitor worker for #{system_config.name}")
     # Subscribe to worker commands
-    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "worker_commands")
+    :ok = Events.subscribe_worker_commands(system_config.name)
+    # Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "worker_commands")
+    :ok = Events.subscribe_system_events()
     Logger.info("📡 Subscribed to worker_commands")
     schedule_first_check()
     {:ok, %{system: system_config, commands: commands_config}}
+  end
+
+
+  @impl true
+  def handle_info({:reload_configuration, %{source: _source}}, state) do
+    Logger.info("#{__MODULE__}  reloading system configuration.")
+    # Here you would implement the logic to reload the configuration
+    # For example, you might fetch the latest config from a shared source
+    commands_config = state.commands
+    {:ok , new_config_global} = SystemMonitor.Config.Loader.load_systems_config()
+    new_config = Enum.find(new_config_global.systems, fn sys -> sys.name == state.system.name end)
+    {:noreply, %{ system: new_config, commands: commands_config}}
+
   end
 
   @impl true
@@ -46,7 +64,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Handle immediate check request from PubSub
   @impl true
-  def handle_info({:trigger_check, system_name}, %{system: system} = state) do
+
+  def handle_info({:worker_command, :trigger_check, system_name}, %{system: system} = state) do
     if system.name == system_name do
       Logger.info("🚀 Immediate check triggered for #{system_name}")
 
@@ -162,7 +181,9 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
     if success_count > 0 do
       do_store_results(system, results_with_status, timestamp, success_count, total_count)
+      BodyCount.report_success(system.ip)
     else
+      BodyCount.report_failure(system.ip)
       log_skipped_storage(system.name, timestamp, total_count)
     end
   end

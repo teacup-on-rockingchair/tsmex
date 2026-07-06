@@ -3,6 +3,7 @@ defmodule SystemMonitorWeb.SystemDetailLive do
   require Logger
 
   alias SystemMonitor.Storage.Records
+  alias SystemMonitor.Events
 
   def mount(%{"system_name" => system_name}, _session, socket) do
     if connected?(socket) do
@@ -74,12 +75,7 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     {:noreply, put_flash(socket, :info, "Refresh requested for #{socket.assigns.system_name}")}
     Logger.info("🔄 Triggering immediate health check for #{system_name}")
 
-    # Option A: Broadcast refresh request via PubSub
-    Phoenix.PubSub.broadcast(
-      SystemMonitor.PubSub,
-      "worker_commands",
-      {:trigger_check, system_name}
-    )
+    Events.send_worker_command(system_name, :trigger_check, system_name)
 
     {:noreply,
      socket
