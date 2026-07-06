@@ -27,7 +27,7 @@ defmodule SystemMonitor.Application do
     if Application.get_env(:system_monitor, :start_body_count, true) do
       IO.puts("Starting BodyCount GenServer with configured systems: #{inspect(configured_systems)}")
       [
-        {System_Monitor.BodyCount, configured_systems}
+        {SystemMonitor.BodyCount, configured_systems}
       ]
     else
       []
