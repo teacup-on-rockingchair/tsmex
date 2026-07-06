@@ -15,19 +15,32 @@ defmodule SystemMonitorWeb.DashboardLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
     end
-
     socket =
       socket
-      |> assign_systems()
       |> assign_commands()
+      |> assign(:services, [])
+      |> assign_sort(:system_name, :asc)
+      |> assign_systems()
       |> assign_services()
       |> assign_expanded_systems()
+      |> assign_last_update()
+
 
     {:ok, socket}
   end
 
   defp assign_systems(socket) do
-    assign(socket, :systems, load_systems())
+    systems =
+      load_systems()
+      |> sort_systems(socket.assigns.sort_by, socket.assigns.sort_dir, socket.assigns.commands || [], socket.assigns.services || [])
+
+    assign(socket, :systems, systems)
+  end
+
+  defp assign_sort(socket, sort_by, sort_dir) do
+    socket
+    |> assign(:sort_by, sort_by)
+    |> assign(:sort_dir, sort_dir)
   end
 
   def assign_commands(socket) do
@@ -59,11 +72,11 @@ defmodule SystemMonitorWeb.DashboardLive do
   end
 
   def handle_info({:system_updated, _system_name, _timestamp}, socket) do
-    {:noreply, assign(socket, systems: load_systems())}
+    {:noreply, assign_systems(socket)}
   end
 
   def handle_info({:system_check_failed, _system_name, _timestamp}, socket) do
-    {:noreply, assign(socket, systems: load_systems())}
+    {:noreply, assign_systems(socket)}
   end
 
   @impl true
@@ -74,6 +87,7 @@ defmodule SystemMonitorWeb.DashboardLive do
       socket =
         socket
         |> assign(systems: load_systems())
+        |> assign_systems()
         |> assign_services()
         |> assign_last_update()
 
@@ -118,6 +132,29 @@ defmodule SystemMonitorWeb.DashboardLive do
     {:noreply, assign(socket, expanded_systems: new_expanded)}
   end
 
+  @impl true
+  def handle_event("sort", %{"by" => by}, socket) do
+    sort_by = parse_sort_by(by)
+
+    sort_dir =
+      if socket.assigns.sort_by == sort_by do
+        toggle_sort_dir(socket.assigns.sort_dir)
+      else
+        default_sort_dir(sort_by)
+      end
+    systems =
+      socket.assigns.systems
+      |> sort_systems(sort_by, sort_dir, socket.assigns.commands || [], socket.assigns.services || [])
+
+    socket =
+      socket
+      |> assign(:sort_by, sort_by)
+      |> assign(:sort_dir, sort_dir)
+      |> assign(:systems, systems)
+
+    {:noreply, socket}
+  end
+
   # ============================================================================
   # Data Loading
   # ============================================================================
@@ -128,6 +165,93 @@ defmodule SystemMonitorWeb.DashboardLive do
 
   defp assign_last_update(socket) do
     assign(socket, last_update: DateTime.utc_now())
+  end
+
+  # ============================================================================
+  # Sorting
+  # ============================================================================
+
+  defp parse_sort_by("system_name"), do: :system_name
+  defp parse_sort_by("health"), do: :health
+  defp parse_sort_by("last_update"), do: :last_update
+  defp parse_sort_by(_), do: :system_name
+
+  defp default_sort_dir(:system_name), do: :asc
+  defp default_sort_dir(:health), do: :desc
+  defp default_sort_dir(:last_update), do: :desc
+
+  defp toggle_sort_dir(:asc), do: :desc
+  defp toggle_sort_dir(:desc), do: :asc
+
+  defp sort_systems(systems, sort_by, sort_dir, _commands, services) do
+    sorter =
+      case sort_by do
+        :system_name ->
+          &String.downcase(system_name(&1))
+
+        :health ->
+          &health_rank(&1, services)
+
+        :last_update ->
+          &last_update_unix(&1)
+      end
+
+    sorted = Enum.sort_by(systems, sorter, :asc)
+
+    case sort_dir do
+      :asc -> sorted
+      :desc -> Enum.reverse(sorted)
+    end
+  end
+
+  defp system_name(system) do
+    cond do
+      Map.has_key?(system, :system_name) -> to_string(system.system_name)
+      Map.has_key?(system, "system_name") -> to_string(system["system_name"])
+      true -> ""
+    end
+  end
+
+  defp health_rank(system, services) do
+    case SystemHealth.health_status(system, services) do
+      :red -> 3
+      :yellow -> 2
+      :green -> 1
+      _ -> 0
+    end
+  end
+
+  defp last_update_unix(system) do
+    timestamps =
+      system
+      |> system_results()
+      |> Enum.map(fn {_command_id, cmd_data} ->
+        Map.get(cmd_data, :last_known_good_time)
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    case timestamps do
+      [] ->
+        0
+
+      _ ->
+        timestamps
+        |> Enum.max(DateTime)
+        |> DateTime.to_unix()
+    end
+  end
+
+  defp system_results(system) do
+    cond do
+      Map.has_key?(system, :results) and is_map(system.results) ->
+        system.results
+
+      Map.has_key?(system, "results") and is_map(system["results"]) ->
+        system["results"]
+
+      true ->
+        %{}
+    end
   end
 
   # ============================================================================
