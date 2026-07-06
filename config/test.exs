@@ -20,3 +20,6 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+config :system_monitor, :config_env, :test
+config :system_monitor, :start_body_count, false

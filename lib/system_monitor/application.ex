@@ -17,11 +17,21 @@ defmodule SystemMonitor.Application do
       SystemMonitor.Scheduler.Supervisor,
       SystemMonitor.SSH.ConnectionPool,
       SystemMonitorWeb.Endpoint,
-      {SystemMonitor.BodyCount, configured_systems}
-    ]
+    ] ++ body_count_children(configured_systems)
 
     opts = [strategy: :one_for_one, name: SystemMonitor.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp body_count_children(configured_systems) do
+    if Application.get_env(:system_monitor, :start_body_count, true) do
+      IO.puts("Starting BodyCount GenServer with configured systems: #{inspect(configured_systems)}")
+      [
+        {System_Monitor.BodyCount, configured_systems}
+      ]
+    else
+      []
+    end
   end
 
   @impl true

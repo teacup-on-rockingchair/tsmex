@@ -56,6 +56,9 @@ config :mox, :verify_on_exit!, true
 # Configure scanner module for production and test environments
 config :system_monitor, :scanner, SystemMonitor.Scanner
 
+# By default start the BodyCount GenServer, but allow it to be disabled in test environment
+config :system_monitor, :start_body_count, true
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
