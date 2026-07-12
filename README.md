@@ -9,6 +9,8 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
+## Tests status
+[![Elixir CI](https://github.com/teacup-on-rockingchair/tsmex/actions/workflows/elixir.yml/badge.svg)](https://github.com/teacup-on-rockingchair/tsmex/actions/workflows/elixir.yml)
 ## Learn more
 
 * Official website: https://www.phoenixframework.org/
