@@ -36,5 +36,9 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - name: Install dependencies
       run: mix deps.get
+    - name: Create systems config for CI
+      run: |
+        mkdir -p ~/.system_monitor
+        echo "[]" > ~/.system_monitor/systems.json
     - name: Run tests
       run: mix test
