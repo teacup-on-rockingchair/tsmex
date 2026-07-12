@@ -144,4 +144,36 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     assert_receive {:system_updated, "test-system", %DateTime{}}, 1000
     assert Process.alive?(pid)
   end
+
+  test "broadcasts system_check_partial when batch has mixed command outcomes" do
+    system = %{name: "test-system", ip: "127.0.0.1"}
+    
+    commands = [
+      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
+    ]
+    
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok,
+     [
+       %{id: "uptime", status: :ok, output: "up 1 day"},
+       %{id: "disk", status: :error, reason: :timeout, message: "timeout"}
+     ]}
+    end)
+    
+    # Keep store mocked so we don't depend on storage internals here
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn _record -> :ok end)
+    
+    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    allow(SystemMonitor.Storage.RecordsMock, self(), pid)
+    
+    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+    send(pid, :check_system)
+    
+    assert_receive {:system_check_partial, "test-system", %DateTime{}, stats}, 1000
+    assert stats.successful == 1
+    assert stats.failed == 1
+    assert Process.alive?(pid)
+  end
 end
