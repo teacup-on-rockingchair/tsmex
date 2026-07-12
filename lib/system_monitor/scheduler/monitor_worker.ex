@@ -95,6 +95,38 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     Process.send_after(self(), :check_system, delay * 1000)
   end
 
+  defp handle_check_results(system, results_with_status, check_timestamp) do
+    successful = Enum.count(results_with_status, fn {_result, ok?} -> ok? end)
+    total = length(results_with_status)
+    failed = total - successful
+    
+    Logger.info(
+      "Health check completed for #{system.name} with #{successful}/#{total} successful commands."
+    )
+    
+    # Lenient: store whenever batch execution succeeded (even partial/all-failed command results)
+    store_results_if_successful(system, results_with_status, check_timestamp)
+    
+    cond do
+      failed == 0 ->
+        :ok
+        
+      successful > 0 ->
+        Phoenix.PubSub.broadcast(
+          SystemMonitor.PubSub,
+          "system_updates",
+          {:system_check_partial, system.name, check_timestamp, %{successful: successful, failed: failed}}
+        )
+        
+      true ->
+        Phoenix.PubSub.broadcast(
+          SystemMonitor.PubSub,
+          "system_updates",
+          {:system_check_failed, system.name, check_timestamp}
+        )
+    end
+  end
+  
   defp perform_health_check(%{system: system, commands: commands}) do
     Logger.info("Starting health check for #{system.name}")
     check_timestamp = DateTime.utc_now()
@@ -102,19 +134,18 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     try do
       # Execute all commands
       results_with_status = execute_all_commands(system, commands, check_timestamp)
+      
       case results_with_status do
-        {:ok, results_with_status } ->
-          successful =
-            Enum.count(results_with_status, fn {_result, ok?} -> ok? end)
-          Logger.info("Health check completed for #{system.name} with #{successful} successful commands.")
-          store_results_if_successful(system, results_with_status, check_timestamp)
+        {:ok, commands_results} ->
+          handle_check_results(system, commands_results, check_timestamp)
+          
         {:error, reason} ->
           Logger.error("Health check failed for #{system.name}. Error: #{inspect(reason)}")
-
+          
           Phoenix.PubSub.broadcast(
             SystemMonitor.PubSub,
             "system_updates",
-            {:system_check_failed, system.name, DateTime.utc_now()}
+            {:system_check_failed, system.name, check_timestamp}
           )
       end
     rescue
@@ -132,7 +163,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
         Phoenix.PubSub.broadcast(
           SystemMonitor.PubSub,
           "system_updates",
-          {:system_check_failed, system.name, DateTime.utc_now()}
+          {:system_check_failed, system.name, check_timestamp}
         )
     end
   end
