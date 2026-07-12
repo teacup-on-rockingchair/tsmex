@@ -122,4 +122,26 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     assert disk.result.value =~ "missing batch result"
     assert Process.alive?(pid)
   end
+
+  test "broadcasts system_updated on successful store (integration path)" do
+    Application.put_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
+    
+    system = %{name: "test-system", ip: "127.0.0.1"}
+    commands = [
+      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw}
+    ]
+    
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok, [%{id: "uptime", status: :ok, output: "up 1 day"}]}
+    end)
+    
+    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    
+    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+    send(pid, :check_system)
+    
+    assert_receive {:system_updated, "test-system", %DateTime{}}, 1000
+    assert Process.alive?(pid)
+  end
 end
