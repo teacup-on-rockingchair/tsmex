@@ -141,42 +141,11 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     
     case runner.execute_batch(system, commands, sudo_password: system[:sudo_password]) do
       {:ok, batch_results} ->
+        batch_by_id = Map.new(batch_results, &{&1.id, &1})
+        
         results_with_status =
           Enum.map(commands, fn cmd ->
-            batch = Enum.find(batch_results, &(&1.id == cmd.id))
-            case batch do
-              %{status: :ok, output: output} ->
-                formatted =
-                try do
-                  OutputFormatter.format_output(output, cmd)
-                rescue
-                  reason ->
-                  Logger.warning("Error formatting output for command #{cmd.id}: #{inspect(output)} #{inspect(reason)}")
-                  %{type: :raw, value: output, display: to_string(output)}
-                end
-                result = build_command_result(cmd, formatted, timestamp)
-                {result, true}
-                
-              %{status: :error, reason: reason, message: message} ->
-                formatted = %{
-                  type: :error,
-                  value: message,
-                  display: "Error (#{reason}): #{message}"
-                }
-                result = build_command_result(cmd, formatted, timestamp)
-                {result, false}
-                
-              nil ->
-                # defensive fallback if batch result missing for a command
-                error_output = "Error: missing batch result for command #{cmd.id}"
-                formatted = %{
-                  type: :error,
-                  value: error_output,
-                  display: error_output
-                }
-                result = build_command_result(cmd, formatted, timestamp)
-                {result, false}
-            end
+            to_result_with_status(cmd, Map.get(batch_by_id, cmd.id), timestamp)
           end)
         
         {:ok, results_with_status}
@@ -185,6 +154,47 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
         Logger.error("Batch execution failed: #{inspect(reason)}")
         {:error, {:connection_failed, inspect(reason)}}
     end
+  end
+  
+  defp to_result_with_status(cmd, %{status: :ok, output: output}, timestamp) do
+    formatted = safe_format_output(output, cmd)
+    result = build_command_result(cmd, formatted, timestamp)
+    {result, true}
+  end
+  
+  defp to_result_with_status(cmd, %{status: :error, reason: reason, message: message}, timestamp) do
+    formatted = %{
+      type: :error,
+      value: message,
+      display: "Error (#{reason}): #{message}"
+    }
+    
+    result = build_command_result(cmd, formatted, timestamp)
+    {result, false}
+  end
+  
+  defp to_result_with_status(cmd, nil, timestamp) do
+    error_output = "Error: missing batch result for command #{cmd.id}"
+    
+    formatted = %{
+      type: :error,
+      value: error_output,
+      display: error_output
+    }
+    
+    result = build_command_result(cmd, formatted, timestamp)
+    {result, false}
+  end
+  
+  defp safe_format_output(output, cmd) do
+    OutputFormatter.format_output(output, cmd)
+  rescue
+    reason ->
+      Logger.warning(
+        "Error formatting output for command #{cmd.id}: #{inspect(output)} #{inspect(reason)}"
+      )
+    
+    %{type: :raw, value: output, display: to_string(output)}
   end
 
   # Build the result data structure for a command
