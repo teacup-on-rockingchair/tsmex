@@ -1,4 +1,4 @@
-defmodule SystemMonitor. Formatter.OutputFormatter do
+defmodule SystemMonitor.Formatter.OutputFormatter do
   @moduledoc """
   Formats command output based on the configured format type.
   """
