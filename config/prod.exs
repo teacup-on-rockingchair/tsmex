@@ -23,3 +23,5 @@ config :logger, level: :info
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
+config :system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunner
+config :system_monitor, :records_module, SystemMonitor.Storage.Records
