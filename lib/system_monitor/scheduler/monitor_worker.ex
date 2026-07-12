@@ -29,10 +29,6 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     {:via, Registry, {SystemMonitor.WorkerRegistry, system_name}}
   end
 
-  def run_command_once_for_test(system, cmd) do
-    execute_command_safely(system, cmd)
-  end
-
   @impl true
   def init({system_config, commands_config}) do
     Logger.info("Starting monitor worker for #{system_config.name}")
@@ -81,8 +77,12 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     {:noreply, state}
   end
 
+  defp command_runner_module do
+    Application.get_env(:system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunner)
+  end
+
   defp schedule_first_check do
-    delay = :rand.uniform(@max_delay_first - @min_delay_first) + @min_delay
+    delay = :rand.uniform(@max_delay_first - @min_delay_first) + @min_delay_first
     Logger.debug("Next check in #{delay} seconds")
     Process.send_after(self(), :check_system, delay * 1000)
   end
@@ -100,15 +100,27 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     try do
       # Execute all commands
       results_with_status = execute_all_commands(system, commands, check_timestamp)
-
-      # Store results only if at least one succeeded
-      store_results_if_successful(system, results_with_status, check_timestamp)
+      case results_with_status do
+        {:ok, results_with_status } ->
+          successful =
+            Enum.count(results_with_status, fn {_result, ok?} -> ok? end)
+          Logger.info("Health check completed for #{system.name} with #{successful} successful commands.")
+          store_results_if_successful(system, results_with_status, check_timestamp)
+        {:error, reason} ->
+          Logger.error("Health check failed for #{system.name}. Error: #{inspect(reason)}")
+          
+          Phoenix.PubSub.broadcast(
+            SystemMonitor.PubSub,
+            "system_updates",
+            {:system_check_failed, system.name, DateTime.utc_now()}
+          )
+      end
     rescue
       error ->
         Logger.error("""
         ❌ Health check failed for #{system.name}
         Error: #{inspect(error)}
-        Type: #{error.__struct__}
+        Type: #{inspect(error.__struct__)}
 
         This was likely a storage, formatting, or configuration error.
         Worker continues running.
@@ -125,43 +137,53 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Execute all commands and track success for each
   defp execute_all_commands(system, commands, timestamp) do
+    runner = command_runner_module()
     
-    Enum.map(commands, fn cmd ->
-      Logger.debug("Executing #{cmd.id} on #{system.name}")
-
-      output = execute_command_safely(system, cmd)
-      is_success = command_successful?(output)
-      formatted = OutputFormatter.format_output(output, cmd)
-
-      result = build_command_result(cmd, formatted, timestamp)
-      {result, is_success}
-    end)
-  end
-
-  # Execute a single command with full error handling
-  defp execute_command_safely(system, cmd) do
-    command_runner_module = Application.get_env(:system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunner)
-    try do
-      command_runner_module.execute(system, cmd.command, cmd.timeout, nil)
-    rescue
-      e ->
-        Logger.error("Exception executing #{cmd.id}:  #{inspect(e)}")
-        "Error: #{Exception.message(e)}"
-    catch
-      :exit, reason ->
-        Logger.error("Exit executing #{cmd.id}: #{inspect(reason)}")
-        "Error: Process exited"
-    end
-  end
-
-  # Determine if command output indicates success (not a connection/error)
-  defp command_successful?(output) do
-    case output do
-      "Connection failed:" <> _ -> false
-      "Error:  timeout" -> false
-      "Error:" <> _ -> false
-      output when is_binary(output) and byte_size(output) > 0 -> true
-      _ -> false
+    case runner.execute_batch(system, commands, sudo_password: system[:sudo_password]) do
+      {:ok, batch_results} ->
+        results_with_status =
+          Enum.map(commands, fn cmd ->
+            batch = Enum.find(batch_results, &(&1.id == cmd.id))
+            case batch do
+              %{status: :ok, output: output} ->
+                formatted =
+                try do
+                  OutputFormatter.format_output(output, cmd)
+                rescue
+                  reason ->
+                  Logger.warning("Error formatting output for command #{cmd.id}: #{inspect(output)} #{inspect(reason)}")
+                  %{type: :raw, value: output, display: to_string(output)}
+                end
+                result = build_command_result(cmd, formatted, timestamp)
+                {result, true}
+                
+              %{status: :error, reason: reason, message: message} ->
+                formatted = %{
+                  type: :error,
+                  value: message,
+                  display: "Error (#{reason}): #{message}"
+                }
+                result = build_command_result(cmd, formatted, timestamp)
+                {result, false}
+                
+              nil ->
+                # defensive fallback if batch result missing for a command
+                error_output = "Error: missing batch result for command #{cmd.id}"
+                formatted = %{
+                  type: :error,
+                  value: error_output,
+                  display: error_output
+                }
+                result = build_command_result(cmd, formatted, timestamp)
+                {result, false}
+            end
+          end)
+        
+        {:ok, results_with_status}
+        
+      {:error, reason} ->
+        Logger.error("Batch execution failed: #{inspect(reason)}")
+        {:error, {:connection_failed, inspect(reason)}}
     end
   end
 
