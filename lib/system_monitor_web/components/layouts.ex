@@ -4,7 +4,8 @@ defmodule SystemMonitorWeb.Layouts do
   used by your application.
   """
 
-  use SystemMonitorWeb, :html  # ← MOVE THIS UP, before attr/slot
+  # ← MOVE THIS UP, before attr/slot
+  use SystemMonitorWeb, :html
 
   @doc """
   Renders your app layout.

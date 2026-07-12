@@ -40,7 +40,8 @@ defmodule SystemMonitorWeb do
     quote do
       use Phoenix.Controller,
         formats: [:html, :json],
-         layouts: [html: {SystemMonitorWeb. Layouts, :app}] 
+        layouts: [html: {SystemMonitorWeb.Layouts, :app}]
+
       use Gettext, backend: SystemMonitorWeb.Gettext
 
       import Plug.Conn
@@ -53,6 +54,7 @@ defmodule SystemMonitorWeb do
     quote do
       use Phoenix.LiveView,
         layout: {SystemMonitorWeb.Layouts, :app}
+
       unquote(html_helpers())
     end
   end

@@ -6,7 +6,7 @@ defmodule SystemMonitor.SSH.ConnectionPool do
   @max_concurrent 20
 
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, %{active:  0}, name: __MODULE__)
+    GenServer.start_link(__MODULE__, %{active: 0}, name: __MODULE__)
   end
 
   def acquire do

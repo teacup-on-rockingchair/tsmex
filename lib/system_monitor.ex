@@ -9,6 +9,6 @@ defmodule SystemMonitor do
   def scan(ip_address_range, username, password) do
     IO.puts("System #{password} is considered dead. Triggering scanner.")
     scanner = Application.fetch_env!(:system_monitor, :scanner)
-    scanner.scan(ip_address_range, username,password)
+    scanner.scan(ip_address_range, username, password)
   end
 end

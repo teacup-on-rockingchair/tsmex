@@ -50,12 +50,12 @@ defmodule SystemMonitor.BodyCount do
   Returns the current state of the counters. Useful for debugging.
   """
   def find_counter(counters, system_ip) when is_list(counters) do
-    Enum.find(counters, fn (elem) ->
+    Enum.find(counters, fn elem ->
       is_map(elem) and Map.has_key?(elem, system_ip)
     end)
   end
 
-  def find_counter(_,_), do: nil
+  def find_counter(_, _), do: nil
 
   @doc """
   Returns the current failure count for the given system_ip. If the system_ip is not found, returns 0.
@@ -75,10 +75,10 @@ defmodule SystemMonitor.BodyCount do
   end
 
   defp increment_counter(counters, system_ip) do
-    Enum.map(counters, fn(elem) ->
+    Enum.map(counters, fn elem ->
       if Map.has_key?(elem, system_ip) do
         Logger.info("Incrementing counter for system #{system_ip} in map #{inspect(elem)}")
-        Map.update(elem, system_ip, 0 ,&(&1 + 1))
+        Map.update(elem, system_ip, 0, &(&1 + 1))
       else
         elem
       end
@@ -93,10 +93,12 @@ defmodule SystemMonitor.BodyCount do
   defp trigger_scan(user, password, state, system_ip, new_counters) do
     config = state.config
     Logger.info("Triggering scanner for user #{user} with password #{password}")
+
     case SystemMonitor.scan(config.ip_range, user, password) do
       nil ->
         Logger.info("No system found in the given range.")
         new_counters
+
       result ->
         Logger.info("System found at IP: #{result}")
         pruned = Enum.reject(state.counters, &Map.has_key?(&1, system_ip))
@@ -114,7 +116,7 @@ defmodule SystemMonitor.BodyCount do
     new_counters = increment_counter(counters, system_ip)
     {_reply, user, password} = get_credentials_internal(system_ip, config)
 
-    if get_counter(new_counters,system_ip) < 3 do
+    if get_counter(new_counters, system_ip) < 3 do
       new_counters
     else
       trigger_scan(user, password, state, system_ip, new_counters)
@@ -127,31 +129,33 @@ defmodule SystemMonitor.BodyCount do
   """
   def handle_reset(counters, system_ip) do
     Logger.info("Resetting counter for system #{system_ip}")
-    new_counters = Enum.reject(counters, fn x -> Map.has_key?(x, system_ip) end )
+    new_counters = Enum.reject(counters, fn x -> Map.has_key?(x, system_ip) end)
     Logger.info("New counters after reset: #{inspect(new_counters)}")
     [%{system_ip => 0} | new_counters]
   end
 
   @impl true
   def init(%{systems: systems} = systems_config) when is_list(systems) do
-    systems_counters = Enum.map(systems_config.systems, fn system ->
-      %{ system.ip => 0 }
-    end)
+    systems_counters =
+      Enum.map(systems_config.systems, fn system ->
+        %{system.ip => 0}
+      end)
+
     :ok = Events.subscribe_system_events()
     {:ok, %{counters: systems_counters, config: systems_config}}
   end
 
   def init(systems_config) do
     raise ArgumentError,
-      "SystemMonitor.BodyCount requires config %{systems: list}, got: #{inspect(systems_config)}"
+          "SystemMonitor.BodyCount requires config %{systems: list}, got: #{inspect(systems_config)}"
   end
 
   @impl true
   def handle_info({:reload_configuration, %{source: _source}}, state) do
     Logger.info("#{__MODULE__}  reloading system configuration.")
     old_counters = state.counters
-    {:ok , new_config} = SystemMonitor.Config.Loader.load_systems_config()
-    Logger.warning("Handle infor state.counters #{old_counters}" )
+    {:ok, new_config} = SystemMonitor.Config.Loader.load_systems_config()
+    Logger.warning("Handle infor state.counters #{old_counters}")
     {:noreply, %{counters: old_counters, config: new_config}}
   end
 
@@ -159,12 +163,20 @@ defmodule SystemMonitor.BodyCount do
   def handle_cast({:increment, system_ip}, state) do
     case find_counter(state.counters, system_ip) do
       nil ->
-        Logger.warning("System #{system_ip} not found in counters. Ignoring increment. state.counters #{inspect(state.counters)}" )
+        Logger.warning(
+          "System #{system_ip} not found in counters. Ignoring increment. state.counters #{inspect(state.counters)}"
+        )
+
         {:noreply, state}
+
       _ ->
         new_counters = handle_increment(state, system_ip)
         new_state = %{state | counters: new_counters}
-        Logger.debug("System #{system_ip}  found in counters. Incrementing state.counters #{inspect(new_state.counters)}" )
+
+        Logger.debug(
+          "System #{system_ip}  found in counters. Incrementing state.counters #{inspect(new_state.counters)}"
+        )
+
         {:noreply, new_state}
     end
   end
@@ -172,49 +184,65 @@ defmodule SystemMonitor.BodyCount do
   @impl true
   def handle_cast({:reset, system_ip}, systems) do
     systems = Map.put(systems, :counters, handle_reset(systems.counters, system_ip))
-    Logger.debug("Reset counter for system #{system_ip}. New counters: #{inspect(systems.counters)}")
+
+    Logger.debug(
+      "Reset counter for system #{system_ip}. New counters: #{inspect(systems.counters)}"
+    )
+
     {:noreply, systems}
   end
 
   @impl true
   def handle_call({:get, system_ip}, _from, state) do
-    value = get_counter(state.counters,  system_ip)
-    Logger.debug("Counter for system #{system_ip} is #{value} state.counters: #{inspect(state.counters)}")
+    value = get_counter(state.counters, system_ip)
+
+    Logger.debug(
+      "Counter for system #{system_ip} is #{value} state.counters: #{inspect(state.counters)}"
+    )
+
     {:reply, value, state}
   end
 
   @impl true
   def handle_call(:pending_rescans, _from, state) do
-    pending = Enum.filter(state.counters, fn(elem) ->
-      Map.values(elem) |> Enum.any?(&(&1 >= 3))
-    end)
+    pending =
+      Enum.filter(state.counters, fn elem ->
+        Map.values(elem) |> Enum.any?(&(&1 >= 3))
+      end)
 
     keys =
       pending
       |> Enum.flat_map(&Map.keys/1)
       |> Enum.uniq()
-    Logger.info("Pending rescans for systems: #{inspect(keys)} and state.counters: #{inspect(state.counters)}")
+
+    Logger.info(
+      "Pending rescans for systems: #{inspect(keys)} and state.counters: #{inspect(state.counters)}"
+    )
+
     {:reply, keys, state}
   end
 
   @impl true
   def handle_call({:get_credentials, system_ip}, _from, state) do
     {:ok, user, password} = get_credentials_internal(system_ip, state.config)
-    Logger.info("Password for system #{system_ip} is #{inspect(password)}  state.counters: #{inspect(state.counters)}")
+
+    Logger.info(
+      "Password for system #{system_ip} is #{inspect(password)}  state.counters: #{inspect(state.counters)}"
+    )
+
     {:reply, {user, password}, state}
   end
-
 
   @doc """
   Returns the password and username for the given system_ip from the configuration.
   """
   def get_credentials_internal(system_ip, config) do
-        case Enum.find(config.systems, fn system -> system.ip == system_ip end) do
-          nil ->
-                {:error, :not_found, :not_found}
-          system ->
-                {:ok, system.username ,system.password}
-        end
-  end
+    case Enum.find(config.systems, fn system -> system.ip == system_ip end) do
+      nil ->
+        {:error, :not_found, :not_found}
 
+      system ->
+        {:ok, system.username, system.password}
+    end
+  end
 end

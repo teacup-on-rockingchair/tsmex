@@ -18,7 +18,11 @@ defmodule SystemMonitor.Scanner do
 
     result_int = List.first(scan_with_passwords(ip_range, username, [password]))
     result = if result_int, do: int_to_ip(result_int), else: nil
-    Logger.info("Scan completed for range #{ip_address_range} with username #{username} and password #{password} with result: #{inspect(result)}")
+
+    Logger.info(
+      "Scan completed for range #{ip_address_range} with username #{username} and password #{password} with result: #{inspect(result)}"
+    )
+
     if result do
       Logger.info("System found at IP: #{result}")
       Loader.set_new_ip(username, password, result)
@@ -26,12 +30,15 @@ defmodule SystemMonitor.Scanner do
     else
       Logger.info("No system found in the given range.")
     end
+
     result
   end
 
   defp scan_with_passwords(ip_range, username, passwords) do
     Enum.reduce_while(passwords, ip_range, fn password, remaining_ips ->
-      Logger.info("Trying password: #{password} #{username} and #{length(remaining_ips)} IPs remaining")
+      Logger.info(
+        "Trying password: #{password} #{username} and #{length(remaining_ips)} IPs remaining"
+      )
 
       new_remaining = scan_ips_with_password(remaining_ips, username, password)
 
@@ -43,65 +50,81 @@ defmodule SystemMonitor.Scanner do
     end)
   end
 
-
   defp scan_ips_with_password(ip_ints, username, password) do
     # Use Task.async_stream for concurrent processing
     atomics = :atomics.new(1, [])
+
     ip_ints
     |> Task.async_stream(
-    fn ip_int ->
-      ip = int_to_ip(ip_int)
-      #IO.puts("Trying #{ip}")
-      case :atomics.get(atomics, 1) do
-        1 ->
-          {:skipped, ip_int}
-        _ ->
-          :ok
-          case try_ssh_connection(ip, username, password) do
-            :success ->
-              Logger.info("Successfully connected to #{ip} with [#{password}]")
-              :atomics.put(atomics, 1, 1) # Mark this IP as successful
-              {:success, ip_int}
+      fn ip_int ->
+        ip = int_to_ip(ip_int)
+        # IO.puts("Trying #{ip}")
+        case :atomics.get(atomics, 1) do
+          1 ->
+            {:skipped, ip_int}
 
-            :failure ->
-              #         IO.puts("Failed to connect to #{ip}")
-              {:failure, ip_int}
-          end
-      end
-    end,
-    max_concurrency: 20,  # Adjust based on your needs
-    timeout: 10_000,      # 10 second timeout per connection
-    on_timeout: :kill_task
+          _ ->
+            :ok
+
+            case try_ssh_connection(ip, username, password) do
+              :success ->
+                Logger.info("Successfully connected to #{ip} with [#{password}]")
+                # Mark this IP as successful
+                :atomics.put(atomics, 1, 1)
+                {:success, ip_int}
+
+              :failure ->
+                #         IO.puts("Failed to connect to #{ip}")
+                {:failure, ip_int}
+            end
+        end
+      end,
+      # Adjust based on your needs
+      max_concurrency: 20,
+      # 10 second timeout per connection
+      timeout: 10_000,
+      on_timeout: :kill_task
     )
-    |> Enum.reduce([],fn
-    {:ok, {:success, ip_int}}, successful ->
-         [ip_int|successful]  # Remove successful IPs from remaining list
+    |> Enum.reduce([], fn
+      {:ok, {:success, ip_int}}, successful ->
+        # Remove successful IPs from remaining list
+        [ip_int | successful]
 
       {:ok, {:failure, ip_int}}, successful ->
         Logger.info("Failed to connect to #{int_to_ip(ip_int)}")
-        successful  # Keep failed IPs in remaining list
+        # Keep failed IPs in remaining list
+        successful
 
-      {:exit, reason},  successful ->
+      {:exit, reason}, successful ->
         Logger.info("Task exited with reason: #{inspect(reason)}")
-         successful  # Handle timeouts/crashes
-      {:ok, {:skipped, reason}},  successful ->
-        Logger.info("Task skipped for reason: #{inspect(reason)}")
-         successful  # Handle skipped tasks
+        # Handle timeouts/crashes
+        successful
 
+      {:ok, {:skipped, reason}}, successful ->
+        Logger.info("Task skipped for reason: #{inspect(reason)}")
+        # Handle skipped tasks
+        successful
     end)
     |> Enum.reverse()
   end
 
   defp try_ssh_connection(ip, username, password) do
     ssh_args = [
-      "-p", password,
+      "-p",
+      password,
       "ssh",
-      "-o", "StrictHostKeyChecking=no",
-      "-o", "UserKnownHostsFile=/dev/null",
-      "-o", "LogLevel=ERROR",
-      "-o", "ConnectTimeout=5",
-      "-o", "PreferredAuthentications=password",
-      "-o", "PubkeyAuthentication=no",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-o",
+      "LogLevel=ERROR",
+      "-o",
+      "ConnectTimeout=5",
+      "-o",
+      "PreferredAuthentications=password",
+      "-o",
+      "PubkeyAuthentication=no",
       "#{username}@#{ip}",
       "echo 'Login successful on #{ip}'"
     ]
@@ -113,7 +136,6 @@ defmodule SystemMonitor.Scanner do
   rescue
     _ -> :failure
   end
-
 
   # Convert IP address to integer
   defp ip_to_int(ip_string) do
@@ -134,7 +156,4 @@ defmodule SystemMonitor.Scanner do
 
     "#{a}.#{b}.#{c}.#{d}"
   end
-
-
-
 end

@@ -1,7 +1,7 @@
 defmodule SystemMonitorWeb.AuthController do
   use SystemMonitorWeb, :controller
 
-#  plug :put_layout, html: {SystemMonitorWeb.Layouts, :root}
+  #  plug :put_layout, html: {SystemMonitorWeb.Layouts, :root}
 
   def login(conn, _params) do
     render(conn, :login, layout: false)
@@ -17,11 +17,12 @@ defmodule SystemMonitorWeb.AuthController do
     Logger.info("ENV AUTH_USERNAME: #{inspect(System.get_env("AUTH_USERNAME"))}")
     Logger.info("Config auth_username: #{inspect(valid_username)}")
     Logger.info("Attempting login with username: #{username}")
+
     if username == valid_username && password == valid_password do
       conn
       |> put_session(:authenticated, true)
       |> put_flash(:info, "Welcome!")
-      |> redirect(to:  "/")
+      |> redirect(to: "/")
     else
       conn
       |> put_flash(:error, "Invalid username or password")

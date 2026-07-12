@@ -9,3 +9,5 @@ Mox.defmock(SystemMonitor.SSH.CommandRunnerMock, for: SystemMonitor.SSH.CommandR
 Mox.defmock(SystemMonitor.SSH.ClientMock, for: SystemMonitor.SSH.ClientBehaviour)
 
 Mox.defmock(SystemMonitor.Storage.RecordsMock, for: SystemMonitor.Storage.RecordsBehaviour)
+
+Mox.defmock(SystemMonitor.Config.LoaderMock, for: SystemMonitor.Config.LoaderBehaviour)

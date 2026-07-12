@@ -2,16 +2,17 @@ defmodule SystemMonitor.Config.Loader do
   @moduledoc """
   Loads external configuration files for systems and commands.
   """
-
+  @behaviour SystemMonitor.Config.LoaderBehaviour
   require Logger
 
   def load_services_config do
     path = get_services_config_path()
+
     case File.read(path) do
       {:ok, content} ->
         case Jason.decode(content) do
-          {:ok, %{"required_services" => required_services,
-                 "optional_services" => optional_services}} ->
+          {:ok,
+           %{"required_services" => required_services, "optional_services" => optional_services}} ->
             {:ok, %{required: required_services, optional: optional_services}}
 
           {:error, error} ->
@@ -40,6 +41,7 @@ defmodule SystemMonitor.Config.Loader do
               ok_ip_range ->
                 {:ok, %{systems: parse_systems(systems), ip_range: ok_ip_range}}
             end
+
           {:error, error} ->
             Logger.error("Failed to parse systems config: #{inspect(error)}")
             {:error, :invalid_json}
@@ -67,13 +69,19 @@ defmodule SystemMonitor.Config.Loader do
                 end
               end)
 
-            updated_content = %{"systems" => updated_systems, "ip_range" => ip_range}
-            |> Jason.encode!(pretty: true)
+            updated_content =
+              %{"systems" => updated_systems, "ip_range" => ip_range}
+              |> Jason.encode!(pretty: true)
 
             case File.write(path, updated_content) do
-              :ok -> :ok
+              :ok ->
+                :ok
+
               {:error, reason} ->
-                Logger.error("Failed to write updated systems config to #{path}: #{inspect(reason)}")
+                Logger.error(
+                  "Failed to write updated systems config to #{path}: #{inspect(reason)}"
+                )
+
                 {:error, :write_failed}
             end
 
@@ -87,25 +95,44 @@ defmodule SystemMonitor.Config.Loader do
         {:error, :file_not_found}
     end
   end
-  
+
   def load_commands_config do
     path = get_commands_config_path()
 
     case File.read(path) do
       {:ok, content} ->
         case Jason.decode(content) do
-          {:ok, %{"commands" => commands}} ->
-            {:ok, parse_commands(commands)}
+          {:ok, %{"commands" => commands} = decoded} ->
+            parsed_commands = parse_commands(commands)
+
+            noise_patterns =
+              decoded
+              |> Map.get("output_sanitization", %{})
+              |> Map.get("noise_patterns", [])
+              |> normalize_noise_patterns()
+
+            {:ok, %{commands: parsed_commands, noise_patterns: noise_patterns}}
+
+          {:ok, _other} ->
+            Logger.error("Invalid commands config shape: missing 'commands' key")
+            {:error, :invalid_commands_config}
 
           {:error, error} ->
             Logger.error("Failed to parse commands config: #{inspect(error)}")
             {:error, :invalid_json}
         end
+
       {:error, reason} ->
         Logger.error("Failed to read commands config from #{path}:  #{inspect(reason)}")
         {:error, :file_not_found}
     end
   end
+
+  defp normalize_noise_patterns(patterns) when is_list(patterns) do
+    Enum.filter(patterns, &is_binary/1)
+  end
+
+  defp normalize_noise_patterns(_), do: []
 
   defp get_services_config_path do
     System.get_env("SERVICES_CONFIG_PATH") ||
@@ -113,7 +140,7 @@ defmodule SystemMonitor.Config.Loader do
   end
 
   defp get_systems_config_path do
-    System. get_env("SYSTEMS_CONFIG_PATH") ||
+    System.get_env("SYSTEMS_CONFIG_PATH") ||
       Path.expand("~/.system_monitor/systems.json")
   end
 
@@ -133,7 +160,7 @@ defmodule SystemMonitor.Config.Loader do
     |> parse_ip_range_length()
     |> parse_ip_range_values()
   end
-  
+
   defp parse_ip_range_length(ip_range) do
     if ip_range == nil or length(ip_range) != 2 do
       Logger.error("Invalid IP range configuration: #{inspect(ip_range)}")
@@ -147,18 +174,21 @@ defmodule SystemMonitor.Config.Loader do
   defp parse_ip_range_values(ip_range) when not is_list(ip_range), do: []
   defp parse_ip_range_values(ip_range) when length(ip_range) == 0, do: []
   defp parse_ip_range_values(ip_range) when length(ip_range) != 2, do: []
-  
+
   defp parse_ip_range_values(ip_range) do
-        Enum.map(ip_range, fn ip ->
-          case :inet.parse_address(to_charlist(ip)) do
-                {:ok, _} -> ip
-                {:error, _} ->
-                  Logger.error("Invalid IP address in range: #{ip}")
-                  nil
-          end
-        end)
-        |> Enum.filter(& &1) # Remove nil values
-        |> parse_ip_range_values_compare(ip_range)
+    Enum.map(ip_range, fn ip ->
+      case :inet.parse_address(to_charlist(ip)) do
+        {:ok, _} ->
+          ip
+
+        {:error, _} ->
+          Logger.error("Invalid IP address in range: #{ip}")
+          nil
+      end
+    end)
+    # Remove nil values
+    |> Enum.filter(& &1)
+    |> parse_ip_range_values_compare(ip_range)
   end
 
   defp parse_ip_range_values_compare(nil, _original_ips), do: []
@@ -168,14 +198,16 @@ defmodule SystemMonitor.Config.Loader do
   defp parse_ip_range_values_compare([start_ip, end_ip], original_ips) do
     case start_ip > end_ip do
       true ->
-        Logger.error("Start IP must be less than or equal to End IP in range: #{inspect(original_ips)}")
+        Logger.error(
+          "Start IP must be less than or equal to End IP in range: #{inspect(original_ips)}"
+        )
+
         []
+
       false ->
         original_ips
     end
   end
-  
-
 
   defp parse_commands(commands) do
     commands

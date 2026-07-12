@@ -1,4 +1,4 @@
-defmodule SystemMonitor.Config. Commands do
+defmodule SystemMonitor.Config.Commands do
   @moduledoc """
   Represents a command configuration for system monitoring.
   """
@@ -14,16 +14,16 @@ defmodule SystemMonitor.Config. Commands do
     timeout: 10_000
   ]
 
-  @type format ::  :raw | :icon | :extract
+  @type format :: :raw | :icon | :extract
 
   @type t :: %__MODULE__{
-          id: String. t(),
-          description: String. t(),
-          command: String. t(),
+          id: String.t(),
+          description: String.t(),
+          command: String.t(),
           format: format(),
           order: integer(),
           enabled: boolean(),
-          timeout:  integer()
+          timeout: integer()
         }
 
   @valid_formats ~w(raw icon extract)
@@ -38,7 +38,7 @@ defmodule SystemMonitor.Config. Commands do
 
     %__MODULE__{
       id: Map.fetch!(map, "id"),
-      description: Map. fetch!(map, "description"),
+      description: Map.fetch!(map, "description"),
       command: Map.fetch!(map, "command"),
       format: String.to_atom(format_str),
       order: Map.get(map, "order", 999),

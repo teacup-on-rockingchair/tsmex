@@ -52,15 +52,15 @@ defmodule SystemMonitor.MixProject do
   end
 
   defp aliases do
-  [
-    setup: ["deps.get", "assets.setup", "assets.build"],
-    "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-    "assets.build":  ["tailwind system_monitor", "esbuild system_monitor"],
-    "assets.deploy": [
-      "tailwind system_monitor --minify",
-      "esbuild system_monitor --minify",
-      "phx.digest"
+    [
+      setup: ["deps.get", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["tailwind system_monitor", "esbuild system_monitor"],
+      "assets.deploy": [
+        "tailwind system_monitor --minify",
+        "esbuild system_monitor --minify",
+        "phx.digest"
+      ]
     ]
-  ]
   end
 end

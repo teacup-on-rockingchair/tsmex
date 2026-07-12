@@ -12,7 +12,7 @@ defmodule SystemMonitor.Config.Systems do
     :ssh_key_path,
     :sudo_password,
     port: 22,
-    enabled:  true,
+    enabled: true,
     timeout: 30_000
   ]
 
@@ -35,10 +35,10 @@ defmodule SystemMonitor.Config.Systems do
       username: Map.fetch!(map, "username"),
       password: Map.get(map, "password"),
       sudo_password: Map.get(map, "sudo_password"),
-      ssh_key_path: Map. get(map, "ssh_key_path"),
+      ssh_key_path: Map.get(map, "ssh_key_path"),
       port: Map.get(map, "port", 22),
       enabled: Map.get(map, "enabled", true),
-      timeout: Map. get(map, "timeout", 30_000)
+      timeout: Map.get(map, "timeout", 30_000)
     }
   end
 

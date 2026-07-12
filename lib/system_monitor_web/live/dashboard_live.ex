@@ -1,8 +1,6 @@
 defmodule SystemMonitorWeb.DashboardLive do
   use SystemMonitorWeb, :live_view
 
-  alias SystemMonitor.Storage.Records
-  alias SystemMonitor.Config.Loader
   alias SystemMonitorWeb.DashboardLive.SystemHealth
   require Logger
 
@@ -15,6 +13,7 @@ defmodule SystemMonitorWeb.DashboardLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
     end
+
     socket =
       socket
       |> assign_commands()
@@ -25,14 +24,18 @@ defmodule SystemMonitorWeb.DashboardLive do
       |> assign_expanded_systems()
       |> assign_last_update()
 
-
     {:ok, socket}
   end
 
   defp assign_systems(socket) do
     systems =
       load_systems()
-      |> sort_systems(socket.assigns.sort_by, socket.assigns.sort_dir, socket.assigns.commands || [], socket.assigns.services || [])
+      |> sort_systems(
+        socket.assigns.sort_by,
+        socket.assigns.sort_dir,
+        socket.assigns.commands || [],
+        socket.assigns.services || []
+      )
 
     assign(socket, :systems, systems)
   end
@@ -44,8 +47,8 @@ defmodule SystemMonitorWeb.DashboardLive do
   end
 
   def assign_commands(socket) do
-    case Loader.load_commands_config() do
-      {:ok, commands} ->
+    case loader_module().load_commands_config() do
+      {:ok, %{commands: commands}} ->
         assign(socket, commands: commands)
 
       {:error, _reason} ->
@@ -56,7 +59,7 @@ defmodule SystemMonitorWeb.DashboardLive do
   end
 
   def assign_services(socket) do
-    case Loader.load_services_config() do
+    case loader_module().load_services_config() do
       {:ok, services} ->
         assign(socket, services: services)
 
@@ -142,9 +145,15 @@ defmodule SystemMonitorWeb.DashboardLive do
       else
         default_sort_dir(sort_by)
       end
+
     systems =
       socket.assigns.systems
-      |> sort_systems(sort_by, sort_dir, socket.assigns.commands || [], socket.assigns.services || [])
+      |> sort_systems(
+        sort_by,
+        sort_dir,
+        socket.assigns.commands || [],
+        socket.assigns.services || []
+      )
 
     socket =
       socket
@@ -160,7 +169,7 @@ defmodule SystemMonitorWeb.DashboardLive do
   # ============================================================================
 
   defp load_systems do
-    Records.get_latest_for_all_systems()
+    records_module().get_latest_for_all_systems()
   end
 
   defp assign_last_update(socket) do
@@ -532,4 +541,7 @@ defmodule SystemMonitorWeb.DashboardLive do
   defp format_status(:ok), do: "OK"
   defp format_status(:warning), do: "Warning"
   defp format_status(:error), do: "Error"
+
+  defp loader_module, do: Application.get_env(:system_monitor, :loader_module, Loader)
+  defp records_module, do: Application.get_env(:system_monitor, :records_module, Records)
 end

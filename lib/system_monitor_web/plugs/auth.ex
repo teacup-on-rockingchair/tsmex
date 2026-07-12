@@ -8,6 +8,7 @@ defmodule SystemMonitorWeb.Plugs.Auth do
     case get_session(conn, :authenticated) do
       true ->
         conn
+
       _ ->
         conn
         |> redirect(to: "/login")

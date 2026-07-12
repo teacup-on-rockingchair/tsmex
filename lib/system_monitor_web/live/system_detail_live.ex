@@ -61,11 +61,12 @@ defmodule SystemMonitorWeb.SystemDetailLive do
   end
 
   def handle_event("copy_to_clipboard", %{"text" => text_str}, socket) do
-     {:noreply,
-       socket
-       |> assign(:loading, false)
-       |>put_flash(:info, "About to copy #{text_str}")}
-#    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(:loading, false)
+     |> put_flash(:info, "About to copy #{text_str}")}
+
+    #    {:noreply, socket}
   end
 
   # Manual refresh (trigger new health check)
@@ -254,7 +255,6 @@ defmodule SystemMonitorWeb.SystemDetailLive do
 
   defp render_status_badge(_), do: nil
 
-
   defp render_result_content(%{result: result, format: _format} = _result_data) do
     case result do
       %{type: :raw, display: display} ->
@@ -317,5 +317,4 @@ defmodule SystemMonitorWeb.SystemDetailLive do
   defp format_timestamp(timestamp) do
     Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%S UTC")
   end
-
 end

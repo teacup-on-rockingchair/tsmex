@@ -5,11 +5,24 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
   alias SystemMonitor.Scheduler.MonitorWorker
   alias SystemMonitor.Config.Commands
 
+  defp flush_mailbox do
+    receive do
+      _ -> flush_mailbox()
+    after
+      0 -> :ok
+    end
+  end
+
   setup :set_mox_from_context
   setup :verify_on_exit!
 
   setup do
-    Application.put_env(:system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunnerMock)
+    Application.put_env(
+      :system_monitor,
+      :command_runner_module,
+      SystemMonitor.SSH.CommandRunnerMock
+    )
+
     Application.put_env(:system_monitor, :records_module, SystemMonitor.Storage.RecordsMock)
 
     on_exit(fn ->
@@ -24,19 +37,32 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     system = %{name: "test-system", ip: "127.0.0.1"}
 
     commands = [
-      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{
+        id: "uptime",
+        command: "uptime",
+        timeout: 1_000,
+        description: "uptime",
+        format: :raw
+      },
       %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
     ]
 
     expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
-      {:ok, [
-        %{id: "uptime", status: :ok, output: "up 1 day"},
-        %{id: "disk", status: :error, reason: :timeout, message: "timeout"}
-      ]}
+      {:ok,
+       [
+         %{id: "uptime", status: :ok, output: "up 1 day"},
+         %{id: "disk", status: :error, reason: :timeout, message: "timeout"}
+       ]}
     end)
+
     expect(SystemMonitor.Storage.RecordsMock, :store, fn _record -> :ok end)
 
-    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
     allow(SystemMonitor.Storage.RecordsMock, self(), pid)
 
@@ -50,7 +76,13 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     system = %{name: "test-system", ip: "127.0.0.1"}
 
     commands = [
-      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{
+        id: "uptime",
+        command: "uptime",
+        timeout: 1_000,
+        description: "uptime",
+        format: :raw
+      },
       %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
     ]
 
@@ -63,6 +95,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     end)
 
     test_pid = self()
+
     expect(SystemMonitor.Storage.RecordsMock, :store, fn record ->
       send(test_pid, {:stored_record, record})
       assert record.system_name == "test-system"
@@ -80,21 +113,31 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
       :ok
     end)
 
-    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
     allow(SystemMonitor.Storage.RecordsMock, self(), pid)
     send(pid, :check_system)
 
-    assert_receive {:stored_record, record}, 1000
+    assert_receive {:stored_record, _record}, 1000
     assert Process.alive?(pid)
   end
-
 
   test "marks command as error when execute_batch omits a command result (nil branch)" do
     system = %{name: "test-system", ip: "127.0.0.1"}
 
     commands = [
-      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{
+        id: "uptime",
+        command: "uptime",
+        timeout: 1_000,
+        description: "uptime",
+        format: :raw
+      },
       %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
     ]
 
@@ -104,12 +147,18 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     end)
 
     test_pid = self()
-    expect(SystemMonitor.Storage.RecordsMock, :store, fn _record ->
-      send(test_pid, {:stored_record, _record})
+
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn record ->
+      send(test_pid, {:stored_record, record})
       :ok
     end)
 
-    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
     allow(SystemMonitor.Storage.RecordsMock, self(), pid)
 
@@ -124,56 +173,215 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
   end
 
   test "broadcasts system_updated on successful store (integration path)" do
-    Application.put_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
-    
     system = %{name: "test-system", ip: "127.0.0.1"}
+
     commands = [
-      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw}
+      %Commands{
+        id: "uptime",
+        command: "uptime",
+        timeout: 1_000,
+        description: "uptime",
+        format: :raw
+      }
     ]
-    
+
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn _record -> :ok end)
+
     expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
       {:ok, [%{id: "uptime", status: :ok, output: "up 1 day"}]}
     end)
-    
-    {:ok, pid} = MonitorWorker.start_link({system, commands})
+
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
+    allow(SystemMonitor.Storage.RecordsMock, self(), pid)
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
-    
+
     Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+    flush_mailbox()
     send(pid, :check_system)
-    
+
     assert_receive {:system_updated, "test-system", %DateTime{}}, 1000
     assert Process.alive?(pid)
   end
 
   test "broadcasts system_check_partial when batch has mixed command outcomes" do
     system = %{name: "test-system", ip: "127.0.0.1"}
-    
+
     commands = [
-      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{
+        id: "uptime",
+        command: "uptime",
+        timeout: 1_000,
+        description: "uptime",
+        format: :raw
+      },
       %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
     ]
-    
+
     expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
       {:ok,
-     [
-       %{id: "uptime", status: :ok, output: "up 1 day"},
-       %{id: "disk", status: :error, reason: :timeout, message: "timeout"}
-     ]}
+       [
+         %{id: "uptime", status: :ok, output: "up 1 day"},
+         %{id: "disk", status: :error, reason: :timeout, message: "timeout"}
+       ]}
     end)
-    
+
     # Keep store mocked so we don't depend on storage internals here
     expect(SystemMonitor.Storage.RecordsMock, :store, fn _record -> :ok end)
-    
-    {:ok, pid} = MonitorWorker.start_link({system, commands})
+
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
     allow(SystemMonitor.Storage.RecordsMock, self(), pid)
-    
+
     Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+    flush_mailbox()
     send(pid, :check_system)
-    
+
     assert_receive {:system_check_partial, "test-system", %DateTime{}, stats}, 1000
     assert stats.successful == 1
     assert stats.failed == 1
     assert Process.alive?(pid)
+  end
+
+  test "sanitizes configured sudo lecture lines from successful output" do
+    system = %{name: "test-system", ip: "127.0.0.1"}
+
+    commands = [
+      %Commands{
+        id: "ver",
+        command: "cat /etc/astm_version",
+        timeout: 1_000,
+        description: "ver",
+        format: :raw
+      }
+    ]
+
+    noisy = """
+    We trust you have received the usual lecture from the local System Administrator.
+    1.2.3
+    """
+
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok, [%{id: "ver", status: :ok, output: noisy}]}
+    end)
+
+    test_pid = self()
+
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn record ->
+      send(test_pid, {:stored_record, record})
+      :ok
+    end)
+
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    allow(SystemMonitor.Storage.RecordsMock, self(), pid)
+
+    send(pid, :check_system)
+
+    assert_receive {:stored_record, record}, 1000
+    assert record.results["ver"].result.value == "1.2.3"
+  end
+
+  test "sanitizes successful output when noise_patterns is configured" do
+    system = %{name: "test-system", ip: "127.0.0.1"}
+
+    commands = [
+      %Commands{
+        id: "ver",
+        command: "cat /etc/astm_version",
+        timeout: 1_000,
+        description: "ver",
+        format: :raw
+      }
+    ]
+
+    noisy = """
+    We trust you have received the usual lecture from the local System Administrator.
+    1.2.3
+    """
+
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok, [%{id: "ver", status: :ok, output: noisy}]}
+    end)
+
+    test_pid = self()
+
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn record ->
+      send(test_pid, {:stored_record, record})
+      :ok
+    end)
+
+    commands_config = %{
+      commands: commands,
+      noise_patterns: ["We trust you have received the usual lecture"]
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    allow(SystemMonitor.Storage.RecordsMock, self(), pid)
+
+    send(pid, :check_system)
+
+    assert_receive {:stored_record, record}, 1000
+    assert record.results["ver"].result.value == "1.2.3"
+  end
+
+  test "keeps successful output unchanged when noise_patterns is empty" do
+    system = %{name: "test-system", ip: "127.0.0.1"}
+
+    commands = [
+      %Commands{
+        id: "ver",
+        command: "cat /etc/astm_version",
+        timeout: 1_000,
+        description: "ver",
+        format: :raw
+      }
+    ]
+
+    noisy = """
+    We trust you have received the usual lecture from the local System Administrator.
+    1.2.3
+    """
+
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok, [%{id: "ver", status: :ok, output: noisy}]}
+    end)
+
+    test_pid = self()
+
+    expect(SystemMonitor.Storage.RecordsMock, :store, fn record ->
+      send(test_pid, {:stored_record, record})
+      :ok
+    end)
+
+    commands_config = %{
+      commands: commands,
+      noise_patterns: []
+    }
+
+    {:ok, pid} = MonitorWorker.start_link({system, commands_config})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    allow(SystemMonitor.Storage.RecordsMock, self(), pid)
+
+    send(pid, :check_system)
+
+    assert_receive {:stored_record, record}, 1000
+    assert record.results["ver"].result.value =~ "We trust you have received the usual lecture"
+    assert record.results["ver"].result.value =~ "1.2.3"
   end
 end

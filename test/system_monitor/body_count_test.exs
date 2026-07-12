@@ -16,7 +16,7 @@ defmodule SystemMonitor.BodyCountTest do
     result = Loader.load_systems_config()
     {:ok, configured_systems} = result
 
-    start_supervised!({SystemMonitor.BodyCount,  configured_systems})
+    start_supervised!({SystemMonitor.BodyCount, configured_systems})
 
     host_1 = "192.168.1.100"
     host_2 = "192.168.1.101"
@@ -33,14 +33,14 @@ defmodule SystemMonitor.BodyCountTest do
       if pid = Process.whereis(SystemMonitor.BodyCount), do: Process.exit(pid, :kill)
     end)
 
-    %{server: server_name, host_1: host_1,host_2: host_2, host_3: host_3, host_4: host_4}
+    %{server: server_name, host_1: host_1, host_2: host_2, host_3: host_3, host_4: host_4}
   end
 
   setup :verify_on_exit!
 
   test "marks host for rescan after 3 failures", ctx do
-    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"admin","password1"  ->  nil end)
-    SystemMonitor.MockScanner |> expect( :scan, 1, fn [_,_],"admin","password3"  ->  nil end)
+    SystemMonitor.MockScanner |> expect(:scan, 1, fn [_, _], "admin", "password1" -> nil end)
+    SystemMonitor.MockScanner |> expect(:scan, 1, fn [_, _], "admin", "password3" -> nil end)
 
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
@@ -75,7 +75,7 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "handles multiple hosts independently", ctx do
-    expect( SystemMonitor.MockScanner , :scan, 1, fn([_,_],"admin","password1") -> nil end)
+    expect(SystemMonitor.MockScanner, :scan, 1, fn [_, _], "admin", "password1" -> nil end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_2)
     BodyCount.report_failure(ctx.host_1)
@@ -106,7 +106,7 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "initiates rescan for hosts that reach failure threshold", ctx do
-    expect( SystemMonitor.MockScanner , :scan, 1, fn([_,_],"admin","password1") -> nil end)
+    expect(SystemMonitor.MockScanner, :scan, 1, fn [_, _], "admin", "password1" -> nil end)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
     BodyCount.report_failure(ctx.host_1)
@@ -115,7 +115,9 @@ defmodule SystemMonitor.BodyCountTest do
   end
 
   test "on successful scan the counter for the lost host gets nullified", ctx do
-    expect( SystemMonitor.MockScanner , :scan, fn (["192.168.1.100","192.168.1.110"], "admin","password1") ->
+    expect(SystemMonitor.MockScanner, :scan, fn ["192.168.1.100", "192.168.1.110"],
+                                                "admin",
+                                                "password1" ->
       IO.puts("Mock scan initiated for password1")
       "192.168.1.100"
     end)

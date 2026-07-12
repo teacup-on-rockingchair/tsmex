@@ -10,7 +10,7 @@ defmodule SystemMonitor.SSH.CommandRunner do
 
   defp client_module,
     do: Application.get_env(:system_monitor, :ssh_client_module, SystemMonitor.SSH.Client)
-  
+
   @impl true
   def execute(system, command, timeout, sudo_password \\ nil) do
     conn_result = client_module().connect(system)
@@ -60,10 +60,10 @@ defmodule SystemMonitor.SSH.CommandRunner do
       case safe_execute(conn, cmd.command, timeout, sudo_password) do
         {:ok, output} ->
           %{id: id, status: :ok, output: output}
-          
-          {:error, reason} ->
-        Logger.warning("Command #{id} failed: #{inspect(reason)}")
-          
+
+        {:error, reason} ->
+          Logger.warning("Command #{id} failed: #{inspect(reason)}")
+
           %{
             id: id,
             status: :error,
@@ -74,28 +74,45 @@ defmodule SystemMonitor.SSH.CommandRunner do
     rescue
       e ->
         Logger.warning("Command #{inspect(id)} raised: #{inspect(e)}")
-      
-      %{
-        id: id,
-        status: :error,
-        reason: :exception,
-        message: Exception.message(e)
-      }
+
+        %{
+          id: id,
+          status: :error,
+          reason: :exception,
+          message: Exception.message(e)
+        }
     catch
       :exit, reason ->
         Logger.warning("Command #{inspect(id)} exited: #{inspect(reason)}")
-      
-      %{
-        id: id,
-        status: :error,
-        reason: :exit,
-        message: format_reason(reason)
-      }
+
+        %{
+          id: id,
+          status: :error,
+          reason: :exit,
+          message: format_reason(reason)
+        }
     end
   end
-  
+
   defp safe_execute(conn, command, timeout, sudo_password) do
-    client_module().execute(conn, command, timeout, sudo_password)
+    effective_command =
+      case sudo_password do
+        nil ->
+          command
+
+        "" ->
+          command
+
+        _ ->
+          "sh -lc " <>
+            shell_escape("printf '%s\\n' #{sudo_password} | sudo -S -p '' -- #{command}")
+      end
+
+    client_module().execute(conn, effective_command, timeout, nil)
+  end
+
+  defp shell_escape(str) do
+    "'" <> String.replace(str, "'", "'\"'\"'") <> "'"
   end
 
   defp maybe_disconnect(nil), do: :ok

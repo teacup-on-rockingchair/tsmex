@@ -1,4 +1,4 @@
-defmodule SystemMonitor. Scheduler.Supervisor do
+defmodule SystemMonitor.Scheduler.Supervisor do
   @moduledoc """
   Supervises all monitor workers.
   """
@@ -6,8 +6,8 @@ defmodule SystemMonitor. Scheduler.Supervisor do
   use Supervisor
   require Logger
 
-  alias SystemMonitor.Config. Loader
-  alias SystemMonitor. Scheduler.MonitorWorker
+  alias SystemMonitor.Config.Loader
+  alias SystemMonitor.Scheduler.MonitorWorker
 
   def start_link(_) do
     Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -16,7 +16,7 @@ defmodule SystemMonitor. Scheduler.Supervisor do
   def init(:ok) do
     Logger.info("Initializing Monitor Supervisor")
 
-    with {:ok, %{ systems: systems, ip_range: _ip_range}} <- Loader.load_systems_config(),
+    with {:ok, %{systems: systems, ip_range: _ip_range}} <- Loader.load_systems_config(),
          {:ok, commands} <- Loader.load_commands_config() do
       children =
         Enum.map(systems, fn system ->

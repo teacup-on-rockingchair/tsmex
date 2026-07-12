@@ -66,7 +66,7 @@
                 phx-click="sort"
                 phx-value-by="system_name"
                 class="inline-flex items-center gap-1 hover:text-gray-900 transition-colors"
-                >
+              >
                 <span>System</span>
                 <span :if={@sort_by == :system_name} class="text-[10px]">
                   <%= if @sort_dir == :asc, do: "↑", else: "↓" %>
@@ -74,17 +74,17 @@
               </button>
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase border-b">
-               <button
-                 type="button"
-                 phx-click="sort"
-                 phx-value-by="health"
-                 class="inline-flex items-center gap-1 hover:text-gray-900 transition-colors"
-                 >
-                 <span>Status</span>
-                 <span :if={@sort_by == :health} class="text-[10px]">
-                   <%= if @sort_dir == :asc, do: "↑", else: "↓" %>
-                 </span>
-               </button>
+              <button
+                type="button"
+                phx-click="sort"
+                phx-value-by="health"
+                class="inline-flex items-center gap-1 hover:text-gray-900 transition-colors"
+              >
+                <span>Status</span>
+                <span :if={@sort_by == :health} class="text-[10px]">
+                  <%= if @sort_dir == :asc, do: "↑", else: "↓" %>
+                </span>
+              </button>
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase border-b">
               <button
@@ -92,7 +92,7 @@
                 phx-click="sort"
                 phx-value-by="last_update"
                 class="inline-flex items-center gap-1 hover:text-gray-900 transition-colors"
-                >
+              >
                 <span>Last Check</span>
                 <span :if={@sort_by == :last_update} class="text-[10px]">
                   <%= if @sort_dir == :asc, do: "↑", else: "↓" %>
@@ -152,7 +152,7 @@
           phx-click="sort"
           phx-value-by="system_name"
           class={"px-2.5 py-1 rounded-full text-xs border transition-colors whitespace-nowrap #{if @sort_by == :system_name, do: "bg-gray-900 text-white border-gray-900", else: "bg-white text-gray-700 border-gray-300 hover:border-gray-400"}"}
-          >
+        >
           Name <%= if @sort_by == :system_name, do: if(@sort_dir == :asc, do: "↑", else: "↓") %>
         </button>
 
@@ -161,7 +161,7 @@
           phx-click="sort"
           phx-value-by="health"
           class={"px-2.5 py-1 rounded-full text-xs border transition-colors whitespace-nowrap #{if @sort_by == :health, do: "bg-gray-900 text-white border-gray-900", else: "bg-white text-gray-700 border-gray-300 hover:border-gray-400"}"}
-          >
+        >
           Status <%= if @sort_by == :health, do: if(@sort_dir == :asc, do: "↑", else: "↓") %>
         </button>
 
@@ -170,18 +170,19 @@
           phx-click="sort"
           phx-value-by="last_update"
           class={"px-2.5 py-1 rounded-full text-xs border transition-colors whitespace-nowrap #{if @sort_by == :last_update, do: "bg-gray-900 text-white border-gray-900", else: "bg-white text-gray-700 border-gray-300 hover:border-gray-400"}"}
-          >
-          Last Check <%= if @sort_by == :last_update, do: if(@sort_dir == :asc, do: "↑", else: "↓") %>
+        >
+          Last Check <%= if @sort_by == :last_update,
+            do: if(@sort_dir == :asc, do: "↑", else: "↓") %>
         </button>
       </div>
     </div>
     <!-- Mobile/Tablet View: Collapsible Cards (hidden on desktop) -->
     <div class="lg:hidden space-y-3">
       <%= for system <- @systems do %>
-          <% health = SystemHealth.health_status(system, @services) %>
-          <div class={"rounded-lg shadow overflow-hidden transition-all #{SystemHealth.health_color_class(health)}"}>
-            <!-- Card Header (Always Visible) -->
-            <button
+        <% health = SystemHealth.health_status(system, @services) %>
+        <div class={"rounded-lg shadow overflow-hidden transition-all #{SystemHealth.health_color_class(health)}"}>
+          <!-- Card Header (Always Visible) -->
+          <button
             phx-click="toggle_system"
             phx-value-system={system.system_name}
             class="w-full px-4 py-4 flex items-center justify-between hover:opacity-90 transition-opacity"

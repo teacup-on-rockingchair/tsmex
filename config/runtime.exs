@@ -92,6 +92,6 @@ if config_env() == :prod do
 
   # Authentication credentials
   config :system_monitor,
-        auth_username: System.fetch_env!("AUTH_USERNAME"),
-        auth_password: System.fetch_env!("AUTH_PASSWORD")
+    auth_username: System.fetch_env!("AUTH_USERNAME"),
+    auth_password: System.fetch_env!("AUTH_PASSWORD")
 end
