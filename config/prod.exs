@@ -25,3 +25,4 @@ config :logger, level: :info
 # of environment variables, is done on config/runtime.exs.
 config :system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunner
 config :system_monitor, :records_module, SystemMonitor.Storage.Records
+config :system_monitor, :loader_module, SystemMonitor.Config.Loader

@@ -542,6 +542,6 @@ defmodule SystemMonitorWeb.DashboardLive do
   defp format_status(:warning), do: "Warning"
   defp format_status(:error), do: "Error"
 
-  defp loader_module, do: Application.get_env(:system_monitor, :loader_module, Loader)
-  defp records_module, do: Application.get_env(:system_monitor, :records_module, Records)
+  defp loader_module, do: Application.get_env(:system_monitor, :loader_module, SystemMonitor.Config.Loader)
+  defp records_module, do: Application.get_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
 end
