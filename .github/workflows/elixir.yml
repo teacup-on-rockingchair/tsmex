@@ -41,4 +41,4 @@ jobs:
         mkdir -p ~/.system_monitor
         cp test/support/test_systems.json ~/.system_monitor/systems.json
     - name: Run tests
-      run: mix test
+      run: mix test --trace
