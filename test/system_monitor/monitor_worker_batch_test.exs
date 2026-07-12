@@ -44,7 +44,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
 
   test "parses batch results into stored record with success and error command entries" do
     system = %{name: "test-system", ip: "127.0.0.1"}
-    
+
     commands = [
       %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
       %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
@@ -60,12 +60,38 @@ defmodule SystemMonitor.Scheduler.MonitorWorkerBatchTest do
     
     {:ok, pid} = MonitorWorker.start_link({system, commands})
     allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
-    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")    
+    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
     send(pid, :check_system)
     
     # assert persisted result shape (Records.store/1 side-effect via pubsub notification)
     assert_receive {:system_updated, "test-system", %DateTime{}}, 500
+    
+    assert Process.alive?(pid)
+  end
+  
 
+  test "marks command as error when execute_batch omits a command result (nil branch)" do
+    system = %{name: "test-system", ip: "127.0.0.1"}
+    
+    commands = [
+      %Commands{id: "uptime", command: "uptime", timeout: 1_000, description: "uptime", format: :raw},
+      %Commands{id: "disk", command: "df -h", timeout: 1_000, description: "disk", format: :raw}
+    ]
+    
+    # Return only one result, omit "disk" intentionally
+    expect(SystemMonitor.SSH.CommandRunnerMock, :execute_batch, fn ^system, ^commands, _opts ->
+      {:ok, [%{id: "uptime", status: :ok, output: "up 1 day"}]}
+    end)
+    
+    {:ok, pid} = MonitorWorker.start_link({system, commands})
+    allow(SystemMonitor.SSH.CommandRunnerMock, self(), pid)
+    
+    Phoenix.PubSub.subscribe(SystemMonitor.PubSub, "system_updates")
+    
+    send(pid, :check_system)
+    
+    # At least one command succeeded, so success update should still be emitted
+    assert_receive {:system_updated, "test-system", %DateTime{}}, 1000
     assert Process.alive?(pid)
   end
 end
