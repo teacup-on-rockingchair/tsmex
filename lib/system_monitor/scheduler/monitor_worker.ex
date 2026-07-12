@@ -7,7 +7,6 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   use GenServer
   require Logger
 
-  alias SystemMonitor.Storage.Records
   alias SystemMonitor.Formatter.OutputFormatter
   alias SystemMonitor.BodyCount
   alias SystemMonitor.Events
@@ -63,7 +62,6 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Handle immediate check request from PubSub
   @impl true
-
   def handle_info({:worker_command, :trigger_check, system_name}, %{system: system} = state) do
     if system.name == system_name do
       Logger.info("🚀 Immediate check triggered for #{system_name}")
@@ -75,6 +73,10 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
     end
 
     {:noreply, state}
+  end
+
+  defp records_module do
+    Application.get_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
   end
 
   defp command_runner_module do
@@ -138,8 +140,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   # Execute all commands and track success for each
   defp execute_all_commands(system, commands, timestamp) do
     runner = command_runner_module()
-
-    case runner.execute_batch(system, commands, sudo_password: system[:sudo_password]) do
+    sudo_password = Map.get(system, :sudo_password)
+    case runner.execute_batch(system, commands, sudo_password: sudo_password) do
       {:ok, batch_results} ->
         batch_by_id = Map.new(batch_results, &{&1.id, &1})
 
@@ -243,7 +245,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
       results: results
     }
 
-    Records.store(record)
+    records_module().store(record)
 
     Logger.info(
       "✓ #{system.name}:  Health check completed - stored #{success_count}/#{total_count} results"

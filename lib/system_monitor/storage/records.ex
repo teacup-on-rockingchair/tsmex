@@ -6,6 +6,7 @@ defmodule SystemMonitor.Storage.Records do
 
   use GenServer
   require Logger
+  @behaviour SystemMonitor.Storage.RecordsBehaviour
 
   @max_records_per_system 30
   @dets_dir "priv/data"
