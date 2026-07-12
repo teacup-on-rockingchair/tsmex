@@ -1,96 +1,109 @@
 defmodule SystemMonitor.SSH.CommandRunner do
   @moduledoc """
-  Executes commands on remote systems via SSH.
+  Executes monitor commands over SSH.
+  Supports both legacy single-command execution and batch execution.
   """
 
+  @behaviour SystemMonitor.SSH.CommandRunnerBehaviour
+
   require Logger
-  alias SystemMonitor.SSH.Client
-  alias SystemMonitor.SSH.ConnectionPool
 
-  def execute(system, command, timeout \\ 10_000) do
-    # Acquire connection slot
-    case ConnectionPool.acquire() do
-      :ok ->
-        try do
-          do_execute(system, command, timeout)
-        after
-          ConnectionPool.release()
-        end
+  defp client_module,
+    do: Application.get_env(:system_monitor, :ssh_client_module, SystemMonitor.SSH.Client)
+  
+  @impl true
+  def execute(system, command, timeout, sudo_password \\ nil) do
+    conn_result = client_module().connect(system)
 
-      :retry ->
-        Process.sleep(100)
-        execute(system, command, timeout)
+    try do
+      case conn_result do
+        {:ok, conn} ->
+          case safe_execute(conn, command, timeout, sudo_password) do
+            {:ok, output} -> output
+            {:error, reason} -> "Error: #{format_reason(reason)}"
+          end
+
+        {:error, reason} ->
+          "Error: #{format_reason(reason)}"
+      end
+    after
+      case conn_result do
+        {:ok, conn} -> maybe_disconnect(conn)
+        _ -> :ok
+      end
     end
   end
 
-  def do_execute(system, command, timeout \\ 10_000) do
-    Logger.debug("=== Executing command on #{system.name} ===")
-    Logger.debug("Original command: #{command}")
-    Logger.debug("System has sudo_password: #{!is_nil(Map.get(system, :sudo_password))}")
+  @impl true
+  def execute_batch(system, commands, opts \\ []) do
+    sudo_password = Keyword.get(opts, :sudo_password, nil)
 
-    case Client.connect(system) do
+    case client_module().connect(system) do
       {:ok, conn} ->
         try do
-          Logger.debug("Connected successfully to #{system.name}")
-
-          # Wrap command to run as root
-          final_command = wrap_with_sudo(system, command)
-          Logger.debug("Final command: #{final_command}")
-
-          sudo_password = Map.get(system, :sudo_password)
-          Logger.debug("Passing sudo_password: #{!is_nil(sudo_password)}")
-
-          result = Client.execute(conn, final_command, timeout, sudo_password)
-          Client.disconnect(conn)
-
-          case result do
-            {:ok, output} ->
-              Logger.debug("Command succeeded, output length: #{String.length(output)}")
-              Logger.debug("Raw output: #{inspect(output)}")
-              cleaned = clean_sudo_output(output)
-              Logger.debug("Cleaned output: #{inspect(cleaned)}")
-              cleaned
-
-            {:error, reason} ->
-              Logger.error("Command failed: #{inspect(reason)}")
-              "Error: #{inspect(reason)}"
-          end
+          results = Enum.map(commands, fn cmd -> run_one(conn, cmd, sudo_password) end)
+          {:ok, results}
         after
-          # ALWAYS disconnect, even on error
-          Client.disconnect(conn)
-          Logger.debug("Connection closed for #{system.name}")
+          maybe_disconnect(conn)
         end
 
       {:error, reason} ->
-        Logger.error("Failed to connect to #{system.name}: #{inspect(reason)}")
-        "Connection failed:  #{inspect(reason)}"
+        {:error, %{reason: :connection_failed, message: format_reason(reason)}}
     end
   end
 
-  defp wrap_with_sudo(system, command) do
-    result =
-      cond do
-        Map.get(system, :sudo_password) ->
-          "sudo -S -i bash -c '#{escape_command(command)}'"
+  defp run_one(conn, cmd, sudo_password) do
+    timeout = Map.get(cmd, :timeout, 10_000)
+    id = Map.get(cmd, :id)
 
-        true ->
-          command
+    try do
+      case safe_execute(conn, cmd.command, timeout, sudo_password) do
+        {:ok, output} ->
+          %{id: id, status: :ok, output: output}
+          
+          {:error, reason} ->
+        Logger.warning("Command #{id} failed: #{inspect(reason)}")
+          
+          %{
+            id: id,
+            status: :error,
+            reason: classify_reason(reason),
+            message: format_reason(reason)
+          }
       end
-
-    Logger.debug("wrap_with_sudo result: #{result}")
-    result
+    rescue
+      e ->
+        Logger.warning("Command #{inspect(id)} raised: #{inspect(e)}")
+      
+      %{
+        id: id,
+        status: :error,
+        reason: :exception,
+        message: Exception.message(e)
+      }
+    catch
+      :exit, reason ->
+        Logger.warning("Command #{inspect(id)} exited: #{inspect(reason)}")
+      
+      %{
+        id: id,
+        status: :error,
+        reason: :exit,
+        message: format_reason(reason)
+      }
+    end
+  end
+  
+  defp safe_execute(conn, command, timeout, sudo_password) do
+    client_module().execute(conn, command, timeout, sudo_password)
   end
 
-  defp escape_command(command) do
-    String.replace(command, "'", "'\\''")
-  end
+  defp maybe_disconnect(nil), do: :ok
+  defp maybe_disconnect(conn), do: client_module().disconnect(conn)
 
-  defp clean_sudo_output(output) do
-    output
-    |> String.replace(~r/^.*Read-only file system.*/m, "")
-    |> String.replace(~r/^.*Failed to start Daily apt download activities\..*/m, "")
-    |> String.replace(~r/^.*Failed to start Daily apt upgrade and clean activities..*/m, "")
-    |> String.replace(~r/\A.*\[sudo\] password for [^:]+:\s*/ms, "")
-    |> String.trim()
-  end
+  defp classify_reason(:timeout), do: :timeout
+  defp classify_reason(_), do: :exec_failed
+
+  defp format_reason(reason) when is_binary(reason), do: reason
+  defp format_reason(reason), do: inspect(reason)
 end

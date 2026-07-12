@@ -7,7 +7,6 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
   use GenServer
   require Logger
 
-  alias SystemMonitor.SSH.CommandRunner
   alias SystemMonitor.Storage.Records
   alias SystemMonitor.Formatter.OutputFormatter
   alias SystemMonitor.BodyCount
@@ -28,6 +27,10 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   defp via_tuple(system_name) do
     {:via, Registry, {SystemMonitor.WorkerRegistry, system_name}}
+  end
+
+  def run_command_once_for_test(system, cmd) do
+    execute_command_safely(system, cmd)
   end
 
   @impl true
@@ -122,6 +125,7 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Execute all commands and track success for each
   defp execute_all_commands(system, commands, timestamp) do
+    
     Enum.map(commands, fn cmd ->
       Logger.debug("Executing #{cmd.id} on #{system.name}")
 
@@ -136,8 +140,9 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
 
   # Execute a single command with full error handling
   defp execute_command_safely(system, cmd) do
+    command_runner_module = Application.get_env(:system_monitor, :command_runner_module, SystemMonitor.SSH.CommandRunner)
     try do
-      CommandRunner.execute(system, cmd.command, cmd.timeout)
+      command_runner_module.execute(system, cmd.command, cmd.timeout, nil)
     rescue
       e ->
         Logger.error("Exception executing #{cmd.id}:  #{inspect(e)}")

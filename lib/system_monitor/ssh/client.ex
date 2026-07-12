@@ -2,7 +2,7 @@ defmodule SystemMonitor.SSH.Client do
   @moduledoc """
   SSH connection management. 
   """
-
+  @behaviour SystemMonitor.SSH.ClientBehaviour
   require Logger
 
   def connect(%{ssh_key_path: key_path} = system) when not is_nil(key_path) do
