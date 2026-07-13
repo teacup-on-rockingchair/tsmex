@@ -1,4 +1,7 @@
 defmodule SystemMonitor.Config.LoaderBehaviour do
+  @moduledoc """
+  Define Configuration loader behaviour
+  """
   @callback load_commands_config() ::
               {:ok, %{commands: list(), noise_patterns: list(String.t())}} | {:error, term()}
 

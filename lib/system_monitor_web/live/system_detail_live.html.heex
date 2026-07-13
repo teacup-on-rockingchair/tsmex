@@ -65,7 +65,7 @@
     <div class="space-y-4">
       <%= for check <- @history do %>
         <% timestamp_str = DateTime.to_iso8601(check.timestamp)
-        is_expanded = is_check_expanded?(@expanded_checks, check.timestamp)
+        is_expanded = check_expanded?(@expanded_checks, check.timestamp)
         is_first = check == List.first(@history) %>
 
         <div class="bg-white rounded-lg shadow-md overflow-hidden">

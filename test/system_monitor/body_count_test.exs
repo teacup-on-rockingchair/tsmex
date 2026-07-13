@@ -7,9 +7,7 @@ defmodule SystemMonitor.BodyCountTest do
   alias SystemMonitor.Config.Loader
 
   setup do
-    IO.puts("Setting up BodyCount GenServer for tests...")
     server_name = make_ref()
-    IO.inspect(server_name, label: "Generated unique server name")
     System.put_env("SYSTEMS_CONFIG_PATH", "test/support/test_systems.json")
     Mox.set_mox_global()
 
@@ -118,7 +116,6 @@ defmodule SystemMonitor.BodyCountTest do
     expect(SystemMonitor.MockScanner, :scan, fn ["192.168.1.100", "192.168.1.110"],
                                                 "admin",
                                                 "password1" ->
-      IO.puts("Mock scan initiated for password1")
       "192.168.1.100"
     end)
 

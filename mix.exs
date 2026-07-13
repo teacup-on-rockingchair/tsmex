@@ -47,7 +47,8 @@ defmodule SystemMonitor.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.2"},
       {:sshex, "~> 2.2"},
-      {:mox, "~> 1.2", only: :test}
+      {:mox, "~> 1.2", only: :test},
+      {:credo, "~> 1.7", only: [:test, :dev], runtime: false}
     ]
   end
 

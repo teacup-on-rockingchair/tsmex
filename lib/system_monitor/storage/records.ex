@@ -52,7 +52,7 @@ defmodule SystemMonitor.Storage.Records do
             :system_states
           )
 
-        if length(existing_systems) > 0 do
+        if existing_systems != [] do
           Logger.info(
             "Restored data for #{length(existing_systems)} systems:  #{inspect(existing_systems)}"
           )
@@ -241,7 +241,7 @@ defmodule SystemMonitor.Storage.Records do
 
   defp merge_command_state(existing, new, check_time) do
     # Check if new result is valid (not an error/timeout)
-    new_is_valid = is_valid_result?(new.result)
+    new_is_valid = valid_result?(new.result)
 
     cond do
       # No existing data - use new data regardless
@@ -262,7 +262,7 @@ defmodule SystemMonitor.Storage.Records do
     end
   end
 
-  defp is_valid_result?(result) do
+  defp valid_result?(result) do
     case result do
       %{value: value} when is_binary(value) ->
         # Check if it's not an error message

@@ -11,8 +11,8 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
 
   def health_status(system_data, services) do
     cond do
-      is_critically_stale?(system_data) -> :red
-      is_healthy?(system_data, services) -> :green
+      critically_stale?(system_data) -> :red
+      healthy?(system_data, services) -> :green
       true -> :yellow
     end
   end
@@ -25,7 +25,7 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
   def health_color_class(:yellow), do: "bg-yellow-100 hover:bg-yellow-200"
 
   # Red: Last check more than 4 hours ago
-  defp is_critically_stale?(system_data) do
+  defp critically_stale?(system_data) do
     case get_last_check_time(system_data) do
       nil ->
         true
@@ -37,7 +37,7 @@ defmodule SystemMonitorWeb.DashboardLive.SystemHealth do
   end
 
   # Green: All conditions met
-  defp is_healthy?(system_data, services) do
+  defp healthy?(system_data, services) do
     within_two_hours?(system_data) and
       all_services_healthy?(system_data, services) and
       network_healthy?(system_data)

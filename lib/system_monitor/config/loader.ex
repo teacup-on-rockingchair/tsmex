@@ -26,26 +26,30 @@ defmodule SystemMonitor.Config.Loader do
     end
   end
 
+  defp parse_systems_config(content) do
+    case Jason.decode(content) do
+      {:ok, %{"systems" => systems, "ip_range" => ip_range}} ->
+        case parse_ip_range(ip_range) do
+          [] ->
+            Logger.error("Invalid IP range configuration: #{inspect(ip_range)}")
+            {:error, :invalid_ip_range}
+
+          ok_ip_range ->
+            {:ok, %{systems: parse_systems(systems), ip_range: ok_ip_range}}
+        end
+
+      {:error, error} ->
+        Logger.error("Failed to parse systems config: #{inspect(error)}")
+        {:error, :invalid_json}
+    end
+  end
+
   def load_systems_config do
     path = get_systems_config_path()
 
     case File.read(path) do
       {:ok, content} ->
-        case Jason.decode(content) do
-          {:ok, %{"systems" => systems, "ip_range" => ip_range}} ->
-            case parse_ip_range(ip_range) do
-              [] ->
-                Logger.error("Invalid IP range configuration: #{inspect(ip_range)}")
-                {:error, :invalid_ip_range}
-
-              ok_ip_range ->
-                {:ok, %{systems: parse_systems(systems), ip_range: ok_ip_range}}
-            end
-
-          {:error, error} ->
-            Logger.error("Failed to parse systems config: #{inspect(error)}")
-            {:error, :invalid_json}
-        end
+        parse_systems_config(content)
 
       {:error, reason} ->
         Logger.error("Failed to read systems config from #{path}: #{inspect(reason)}")
@@ -53,47 +57,45 @@ defmodule SystemMonitor.Config.Loader do
     end
   end
 
-  def set_new_ip(username, password, new_ip) do
+  def update_system_ip({:error, reason}, _u, _p, _ip), do: {:error, reason}
+
+  def update_system_ip({:ok, %{systems: systems, ip_range: ip_range}}, username, password, new_ip) do
+    updated_systems =
+      Enum.map(systems, fn system ->
+        if system.username == username and system.password == password do
+          Map.put(system, :ip, new_ip)
+        else
+          system
+        end
+        |> Map.from_struct()
+      end)
+
+    updated_content =
+      %{"systems" => updated_systems, "ip_range" => ip_range}
+      |> Jason.encode!(pretty: true)
+
+    {:ok, updated_content}
+  end
+
+  def save_systems_config({:error, reason}), do: {:error, reason}
+
+  def save_systems_config({:ok, updated_config}) do
     path = get_systems_config_path()
 
-    case File.read(path) do
-      {:ok, content} ->
-        case Jason.decode(content) do
-          {:ok, %{"systems" => systems, "ip_range" => ip_range}} ->
-            updated_systems =
-              Enum.map(systems, fn system ->
-                if system["username"] == username and system["password"] == password do
-                  Map.put(system, "ip", new_ip)
-                else
-                  system
-                end
-              end)
-
-            updated_content =
-              %{"systems" => updated_systems, "ip_range" => ip_range}
-              |> Jason.encode!(pretty: true)
-
-            case File.write(path, updated_content) do
-              :ok ->
-                :ok
-
-              {:error, reason} ->
-                Logger.error(
-                  "Failed to write updated systems config to #{path}: #{inspect(reason)}"
-                )
-
-                {:error, :write_failed}
-            end
-
-          {:error, error} ->
-            Logger.error("Failed to parse systems config: #{inspect(error)}")
-            {:error, :invalid_json}
-        end
+    case File.write(path, updated_config) do
+      :ok ->
+        :ok
 
       {:error, reason} ->
-        Logger.error("Failed to read systems config from #{path}: #{inspect(reason)}")
-        {:error, :file_not_found}
+        Logger.error("Failed to write updated systems config to #{path}: #{inspect(reason)}")
+        {:error, :write_failed}
     end
+  end
+
+  def set_new_ip(username, password, new_ip) do
+    load_systems_config()
+    |> update_system_ip(username, password, new_ip)
+    |> save_systems_config()
   end
 
   def load_commands_config do
@@ -172,7 +174,7 @@ defmodule SystemMonitor.Config.Loader do
 
   defp parse_ip_range_values(ip_range) when ip_range == nil, do: []
   defp parse_ip_range_values(ip_range) when not is_list(ip_range), do: []
-  defp parse_ip_range_values(ip_range) when length(ip_range) == 0, do: []
+  defp parse_ip_range_values(ip_range) when ip_range == [], do: []
   defp parse_ip_range_values(ip_range) when length(ip_range) != 2, do: []
 
   defp parse_ip_range_values(ip_range) do

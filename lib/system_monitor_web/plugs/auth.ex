@@ -1,4 +1,7 @@
 defmodule SystemMonitorWeb.Plugs.Auth do
+  @moduledoc """
+  Handle web user authentication
+  """
   import Plug.Conn
   import Phoenix.Controller
 

@@ -205,7 +205,7 @@ defmodule SystemMonitorWeb.SystemDetailLive do
   defp get_most_recent_time([latest | _]), do: latest.timestamp
 
   # Check if a timestamp section is expanded
-  defp is_check_expanded?(expanded_checks, timestamp) do
+  defp check_expanded?(expanded_checks, timestamp) do
     timestamp_str = DateTime.to_iso8601(timestamp)
     MapSet.member?(expanded_checks, timestamp_str)
   end
@@ -307,7 +307,7 @@ defmodule SystemMonitorWeb.SystemDetailLive do
     cond do
       diff_seconds < 60 -> "#{diff_seconds}s ago"
       diff_seconds < 3600 -> "#{div(diff_seconds, 60)}m ago"
-      diff_seconds < 86400 -> "#{div(diff_seconds, 3600)}h ago"
+      diff_seconds < 86_400 -> "#{div(diff_seconds, 3600)}h ago"
       true -> "#{div(diff_seconds, 86400)}d ago"
     end
   end

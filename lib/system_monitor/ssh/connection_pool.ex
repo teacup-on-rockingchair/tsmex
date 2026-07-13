@@ -1,4 +1,8 @@
 defmodule SystemMonitor.SSH.ConnectionPool do
+  @moduledoc """
+  Connection pool for SSH
+  Make sure we do not overload the system with too much ssh connections
+  """
   use GenServer
   require Logger
 

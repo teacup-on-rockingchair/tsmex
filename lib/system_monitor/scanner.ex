@@ -50,6 +50,21 @@ defmodule SystemMonitor.Scanner do
     end)
   end
 
+  defp schedule_ssh_connection(atomics, ip_int, username, password) do
+    ip = int_to_ip(ip_int)
+
+    case try_ssh_connection(ip, username, password) do
+      :success ->
+        Logger.info("Successfully connected to #{ip} with [#{password}]")
+        # Mark this IP as successful
+        :atomics.put(atomics, 1, 1)
+        {:success, ip_int}
+
+      :failure ->
+        {:failure, ip_int}
+    end
+  end
+
   defp scan_ips_with_password(ip_ints, username, password) do
     # Use Task.async_stream for concurrent processing
     atomics = :atomics.new(1, [])
@@ -57,26 +72,12 @@ defmodule SystemMonitor.Scanner do
     ip_ints
     |> Task.async_stream(
       fn ip_int ->
-        ip = int_to_ip(ip_int)
-        # IO.puts("Trying #{ip}")
         case :atomics.get(atomics, 1) do
           1 ->
             {:skipped, ip_int}
 
           _ ->
-            :ok
-
-            case try_ssh_connection(ip, username, password) do
-              :success ->
-                Logger.info("Successfully connected to #{ip} with [#{password}]")
-                # Mark this IP as successful
-                :atomics.put(atomics, 1, 1)
-                {:success, ip_int}
-
-              :failure ->
-                #         IO.puts("Failed to connect to #{ip}")
-                {:failure, ip_int}
-            end
+            schedule_ssh_connection(atomics, ip_int, username, password)
         end
       end,
       # Adjust based on your needs

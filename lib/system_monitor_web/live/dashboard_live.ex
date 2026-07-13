@@ -281,7 +281,7 @@ defmodule SystemMonitorWeb.DashboardLive do
           |> assign(:result, cmd_data.result)
           |> assign(:last_good_time, Map.get(cmd_data, :last_known_good_time))
           |> assign(:check_failed, Map.get(cmd_data, :check_failed, false))
-          |> assign(:is_stale, is_data_stale?(cmd_data))
+          |> assign(:is_stale, data_stale?(cmd_data))
 
         render_command_result(assigns)
     end
@@ -379,7 +379,7 @@ defmodule SystemMonitorWeb.DashboardLive do
           |> assign(:result, cmd_data.result)
           |> assign(:last_good_time, Map.get(cmd_data, :last_known_good_time))
           |> assign(:check_failed, Map.get(cmd_data, :check_failed, false))
-          |> assign(:is_stale, is_data_stale?(cmd_data))
+          |> assign(:is_stale, data_stale?(cmd_data))
 
         render_command_result_mobile(assigns)
     end
@@ -451,7 +451,7 @@ defmodule SystemMonitorWeb.DashboardLive do
     get_in(system.results, [command.id])
   end
 
-  defp is_data_stale?(cmd_data) do
+  defp data_stale?(cmd_data) do
     case Map.get(cmd_data, :last_known_good_time) do
       nil -> false
       timestamp -> DateTime.diff(DateTime.utc_now(), timestamp, :hour) > 24
@@ -494,8 +494,8 @@ defmodule SystemMonitorWeb.DashboardLive do
     cond do
       diff_seconds < 60 -> "#{diff_seconds}s ago"
       diff_seconds < 3600 -> "#{div(diff_seconds, 60)}m ago"
-      diff_seconds < 86400 -> "#{div(diff_seconds, 3600)}h ago"
-      diff_seconds < 2_592_000 -> "#{div(diff_seconds, 86400)}d ago"
+      diff_seconds < 86_400 -> "#{div(diff_seconds, 3600)}h ago"
+      diff_seconds < 2_592_000 -> "#{div(diff_seconds, 86_400)}d ago"
       diff_seconds < 31_536_000 -> "#{div(diff_seconds, 2_592_000)}mo ago"
       true -> "#{div(diff_seconds, 31_536_000)}y ago"
     end
@@ -505,7 +505,7 @@ defmodule SystemMonitorWeb.DashboardLive do
   # Helper Functions - UI State
   # ============================================================================
 
-  defp is_expanded?(expanded_systems, system_name) do
+  defp expanded?(expanded_systems, system_name) do
     MapSet.member?(expanded_systems, system_name)
   end
 
@@ -517,8 +517,8 @@ defmodule SystemMonitorWeb.DashboardLive do
     cond do
       diff_seconds < 60 -> "Just now"
       diff_seconds < 3600 -> "#{div(diff_seconds, 60)}m ago"
-      diff_seconds < 86400 -> "#{div(diff_seconds, 3600)}h ago"
-      true -> "#{div(diff_seconds, 86400)}d ago"
+      diff_seconds < 86_400 -> "#{div(diff_seconds, 3600)}h ago"
+      true -> "#{div(diff_seconds, 86_400)}d ago"
     end
   end
 
@@ -542,6 +542,9 @@ defmodule SystemMonitorWeb.DashboardLive do
   defp format_status(:warning), do: "Warning"
   defp format_status(:error), do: "Error"
 
-  defp loader_module, do: Application.get_env(:system_monitor, :loader_module, SystemMonitor.Config.Loader)
-  defp records_module, do: Application.get_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
+  defp loader_module,
+    do: Application.get_env(:system_monitor, :loader_module, SystemMonitor.Config.Loader)
+
+  defp records_module,
+    do: Application.get_env(:system_monitor, :records_module, SystemMonitor.Storage.Records)
 end
