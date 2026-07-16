@@ -13,6 +13,7 @@ Ready to run in production? Please [check our deployment guides](https://hexdocs
 [![Elixir CI](https://github.com/teacup-on-rockingchair/tsmex/actions/workflows/elixir.yml/badge.svg)](https://github.com/teacup-on-rockingchair/tsmex/actions/workflows/elixir.yml)
 ## Learn more
 
+* [Getting Started Guide](GETTING-STARTED.md)
 * Official website: https://www.phoenixframework.org/
 * Guides: https://hexdocs.pm/phoenix/overview.html
 * Docs: https://hexdocs.pm/phoenix
