@@ -155,7 +155,7 @@ defmodule SystemMonitor.BodyCount do
     Logger.info("#{__MODULE__}  reloading system configuration.")
     old_counters = state.counters
     {:ok, new_config} = SystemMonitor.Config.Loader.load_systems_config()
-    Logger.warning("Handle infor state.counters #{old_counters}")
+    Logger.warning("Handle infor state.counters #{inspect(old_counters)}")
     {:noreply, %{counters: old_counters, config: new_config}}
   end
 
