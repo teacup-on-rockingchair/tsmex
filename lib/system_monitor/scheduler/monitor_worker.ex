@@ -180,6 +180,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
         {:error, reason} ->
           Logger.error("Health check failed for #{system.name}. Error: #{inspect(reason)}")
 
+          BodyCount.report_failure(system.ip)
+
           Phoenix.PubSub.broadcast(
             SystemMonitor.PubSub,
             "system_updates",
@@ -196,6 +198,8 @@ defmodule SystemMonitor.Scheduler.MonitorWorker do
         This was likely a storage, formatting, or configuration error.
         Worker continues running.
         """)
+
+        BodyCount.report_failure(system.ip)
 
         # Notify of failure
         Phoenix.PubSub.broadcast(
